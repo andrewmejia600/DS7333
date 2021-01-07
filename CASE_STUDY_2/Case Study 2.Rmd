@@ -1,0 +1,100 @@
+---
+title: "Case Study 2"
+author: "Andrew Mejia"
+date: "1/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Business Understanding 
+> *Describe the business objective being discussed in the case; what problem is being solved for and why might it be important? What considerations or assumptions are being made that may have an impact on the approach being suggested or implemented?*
+
+As technology progresses and IOT (internet of things) technology becomes more prevalent in all of our environments, "indoor positioning systems (IPS)
+can utilize WiFi signals detected from network access points to answer questions such as:
+where is a piece of equipment in a building? where am I? and who are my neighbors? how much traffic is this corridor getting? Ideally, with minimal training, calibration, and equipment, these questions can be answered well in near real-time. (Nolan, Lang et. all, 2015)." 
+
+In particular, such an indoor positioning system can be used for geofencing of materials with the combination use of passive and active RFID tags, especially when potentientially when considering climate controlled materials, shelf life materials and their seperation and storage. 
+
+In order to build an indoor positioning system, a reference set (training)  of data where the signal
+strength between a hand-held device such as a cellular phone, laptop, wireless radio frequency device and fixed access points (routers) are measured at known locations throughout the building (Nolan, Lang et. all, 2015). The idea here, is to be able to collect this data in a fashion that either say somone who has either a RF signal application on their phone or stand alone RF scanner can take measurements about their facility, or better yet, when enterprise WIFI is set up on site, the network engineers document these measurements as part of their access point deployment scope of work. However this data is collected, we can use this potentially as training data.  
+
+From this training data, we can construct a model for the 2 dimensional location, in this case, (X,Y) coordinates, of a device as a function of the strength of the signals between the device and each access point. This model can then be used to predict the 2 dimensional location of a new unknown device based on the detected signals for the device (Nolan, Lang et. all, 2015).
+
+Key assumptions: 
+
+- We examine nearly one million measurements of signal strength recorded at 6
+stationary WiFi access points (routers) within a building at the University of Mannheim
+and develop a statistical IPS.
+
+- Two relevant data sets for developing an IPS are available on the rdatasiencecases.org website. 
+> - http://rdatasciencecases.org/Data/offline.final.trace.txt
+> - http://rdatasciencecases.org/Data/online.final.trace.txt
+
+- One is a reference set, termed “offline,” that contains signal strengths measured using a hand-held device on
+a grid of 166 points spaced 1 meter apart in the hallways of one floor of a building at the
+University of Mannheim. The floor plan, which measures about 15 meters by 36 meters (Nolan, Lang et. all, 2015). 
+
+- Signal strengths were recorded at 8 equially spaced orientations in 45 degree increments (i.e., 0, 45, 90, 135, ...,315). This is meaningful, since some of the angles will need to have an imputation corrected applied to them as part of the data clean up. For this analysis, note the values near 0 and near 360
+refer to the same direction. That is, an orientation value 1 degree before 0 is reported as
+359 and 1 degree past 0 is a 1.
+
+- As part of the orientation angle correction, an angle of 47.5 will be mapped to 45, and 358.2 to 0, and so on. To do this, we take each value and find out to which of the 8 orientations it is closest and we return that orientation. Values such as 358.2 must be handled carefully as we want to map them to 0, not to the closer
+315 (Nolan, Lang et. all, 2015).
+
+
+
+- 110 signal strength measurements were recorded to each of the 6 access points for every location-orientation combination
+
+- The “online” data, is available for testing models for predicting location as a hold out set. In these data, 60 locations and orienta- tions are chosen at random and 110 signals are measured from them to each access point (Nolan, Lang et. all, 2015).
+
+- In both the offline and online data some of these 110 signal strength values were not recorded (Nolan, Lang et. all, 2015). 
+
+- Measurements from other hand-held devices, e.g., phone or laptop, in the vicinity of the experimental unit appear in some offline records (Nolan, Lang et. all, 2015).
+
+- The media access control, from herein MAC, variable refers to the MAC address of a hardware device, which is a unique identifier that allows a network card for a device to be identified on a network (Nolan, Lang et. all, 2015). It shall be the primary identifier used to group signal strengths in this analysis. 
+
+- There are 12 MAC addresses and 8 channels. According to the documentation we find that there are additional access points that are not part of the testing area and so not seen on the floor plan, therefore, the analysis will focus on the 6 access points as pointed out in the floor plan (Nolan, Lang et. all, 2015). 
+
+
+- Variable
+t
+id
+pos
+degree
+MAC
+Units
+timestamp in milliseconds since midnight, January 1, 1970 UTC
+MAC address of the scanning device
+the physical coordinate of the scanning device
+orientation of the user carrying the scanning device in degrees
+MAC address of a responding peer (e.g., an access point or a device
+in adhoc mode) with the corresponding values for signal strength
+in dBm (Decibel-milliwatts), the channel frequency and its mode
+(access point = 3, device in adhoc mode = 1)
+
+# Data Evaluation / Engineering
+> *Summarize the data being used in the case using appropriate mediums (charts, graphs, tables); address questions such as: Are there missing values? Which variables are needed (which ones are not)? What assumptions or conclusions are you drawing that need to be relayed to your audience?*
+
+# Modeling Preparations
+> *Which methods are you proposing to utilize to solve the problem?  Why is this method appropriate given the business objective? How will you determine if your approach is useful (or how will you differentiate which approach is more useful than another)?*
+
+This method will use a K- nearest neighboors model based on euclidean distance and manhattan to predict an unknown device's (X,Y) coordinates. 
+
+# Modeling Scenarios (original Case)
+> *The original case proposes an approach which excludes one of the MAC addresses:
+
+> - Swap out the MAC addresses (i.e., include the one they excluded) and rerun the process
+> - Include both MAC addresses and rerun the process
+> - Which scenario generated better results?  Being mindful of how you stated you'd evaluate modeling performance    (or utility)
+
+>Important: use charts, graphs, and tables to consolidate your analysis; use written analysis to supplement these   visual mediums as well as to "explain" your decision-making process
+
+# Case Conclusions
+> - After all of your technical analysis and modeling; what are you proposing to your audience and why?  
+
+> - How should they view your results and what should they consider when moving forward?  
+
+> - Are there other approaches you'd recommend exploring?  This is where you "bring it all home" in language they   understand.
