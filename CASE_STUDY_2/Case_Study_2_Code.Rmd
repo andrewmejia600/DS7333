@@ -1,0 +1,413 @@
+---
+title: "Case_Study_1"
+author: "Andrew Mejia"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  github_document:
+    toc: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+    toc_depth: '6'
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# The following code has been adopted from the text book 
+# https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
+# and class room starter code 
+```{r}
+library(tidyverse)
+library(magrittr)
+library(plotly)
+library(DT)
+```
+
+## Clustering Distance and Mac Addresses of interest
+```{r}
+#Clustering Distance methods 
+Cluster_Dist = 'Manhattan'
+errMethod = ifelse(Cluster_Dist == 'Manhattan','MAE','RMSE')
+
+#inverse of distance PG 42 
+weightFormula = function(x){ 1/(x)} 
+
+# Required MAC Addresses of interest 
+macAddressInt = c(
+  #'00:0f:a3:39:e1:c0', #Exclude from list
+  '00:0f:a3:39:dd:cd',
+  '00:14:bf:b1:97:8a',
+  '00:14:bf:3b:c7:c6',
+  '00:14:bf:b1:97:90',
+  '00:14:bf:b1:97:8d',
+  '00:14:bf:b1:97:81'
+)
+
+```
+
+## This is the directory of the data f_paths passed out during class. 
+```{r}
+offline_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/Data/offline.final.trace.txt"
+online_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/Data/online.final.trace.txt"
+```
+
+# The following function are from the starter code to process the raw data 
+
+```{r}
+# Create a function to parse the data based on the tokens passed 
+processLine = function(x){
+  # Split the line on: ';', '=' and ','
+  tokens = strsplit(x, "[;=,]")[[1]]
+  
+  # The hand held device
+  # is in the 1st 10 tokens (refer to text on page 9)
+  # We change our function to return NULL if the tokens vector only has 10 elements (refer to page 11) as in the case of a missing signal
+  if (length(tokens) == 10) {
+    return(NULL)
+  }
+  
+  # The tokens after the 10th one represent the signal strength at the access points (page 9). 
+  # Split the tokens into individual attributes:  MAC address, Signal, Channel and Device Type
+  # Device mode type 3 is important  page 6 and 7 table 1.1 
+  # Device mode type 1 is the adhoc device
+  # save this into tmp as a matrix with tokens 1:10 
+  tmp = matrix(data = tokens[ - (1:10) ], ncol = 4, byrow = TRUE)
+  
+  #We can think of these as rows in a 4-column matrix or data frame giving the MAC address,signal, channel, and device type, 
+  #So let’s unravel these and build a matrix from the values.
+  #Then we can bind these columns with the values from the first 10 entries.
+  cbind(matrix(tokens[c(2, 4, 6:8, 10)], nrow(tmp), 6, byrow = TRUE), tmp)
+}
+```
+
+#From page 15, round orientation takes a parameter angles and rounds based on 45 degree increments and reorientates the angle and splits the near zero angles to map angles near 0 to 0 and near 360 to 360. 
+```{r}
+roundOrientation = function(angles) {
+  refs = seq(0, by = 45, length = 9)
+  q = sapply(angles, function(o) which.min(abs(o - refs)))
+    c(refs[1:8], 0)[q]
+  }
+```
+
+# Page 19 exercise to create readData() function
+
+```{r}
+# The purpose of this function is  to read the data f_path as described in page 19,  transform the parsed f_path to the dataframe for analysis
+# f_path is the name of offline and online data to be read in
+# macAddressInt The list of Mac addresses of interest, initialize at Null as a placeholder
+# Return A dataframe df
+
+
+readData = function(f_path, macAddressInt=NULL){
+  # Read in the raw "offline" text from f_path
+  txt = readLines(f_path)
+  
+#Process and input raw data
+  
+  # Parse the f_path lines and not include '#' 
+  lines = txt[substr(txt, 1, 1) != "#" ]
+  
+  #apply processesline function to read lines and save as a temporary variable 
+  tmp = lapply(lines, processLine)
+  
+  # Convert the tmp variable to a data frame df through binding rows 
+  df = as.data.frame(do.call("rbind", tmp), stringsAsFactors = FALSE)
+
+# Begin process to construction offline dataframe 
+  
+  # Assign column names to the offline dataframe from time, scanMac, posX, posY, posZ, orientation angle, mac, signal, channel and type
+  names(df) = c(
+    "time", "scanMac", "posX", "posY", "posZ",
+    "orientation", "mac", "signal",
+    "channel", "type"
+  )
+  
+  #Cast the string variables from the data to numeric variables 
+  
+  numericVars = c("time", "posX", "posY", "posZ", "orientation", "signal")
+  df[numericVars] = lapply(df[numericVars], as.numeric)
+  
+  # We will only keep required device types and remove the adhoc device (mode 1) refer to page 7 table 1.1
+  df = df[df$type != 1, ]
+
+  # We are only interested in the mac addresses of interest
+  # We will filter the data frame to only include macs of interest and return the attributes of the macs of interest
+  df = df[df$mac %in% macAddressInt, ]
+
+  
+  # Drop the scanMac and posZ attributes 
+  
+  #https://stackoverflow.com/questions/4605206/drop-data-frame-columns-by-name 
+  #Max Ghenis Answer
+  
+  df = within(df, rm("scanMac", "posZ")) 
+
+  # Apply round orientation function to df orientation to round angles 
+  df$angle = roundOrientation(df$orientation)
+  
+  # Create posXY column 
+  df$posXY = paste(df$posX, df$posY, sep = "-")
+
+  return(df)
+}
+```
+
+# Offline data
+
+```{r}
+numMacs = length(macAddressInt)
+numMacs
+```
+
+
+```{r}
+offline = readData(f_path = offline_f_path, macAddressInt = macAddressInt)
+dim(offline)
+length(unique(offline$posXY))
+```
+
+# Online Data
+```{r}
+online = readData(f_path = online_f_path, macAddressInt = macAddressInt)
+dim(online)
+length(unique(online$posXY))
+```
+
+# Function (Reshape) page 33
+```{r}
+# Unlike text example, we will initialize sampleAngle as false, so we do not select a sample of angles, if True, the ans x will take a randon sample from the 45 degree angles. This sampling technique was borrowed from 
+#https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
+
+reshapeSS = function(data, varSignal = "signal", keepVars = c("posXY", "posX", "posY"), sampleAngle = FALSE) {
+  refs = seq(0, by = 45, length = 8)
+  byLocation =
+  with(
+    data,
+    by(
+      data,
+      list(posXY),
+      function(x) {
+        if (sampleAngle) x = x[x$angle == sample(refs, size = 1), ]
+        ans = x[1, keepVars]
+        avgSS = tapply(x[ , varSignal ], x$mac, mean)
+        y = matrix(avgSS, nrow = 1, ncol = numMacs,
+        dimnames = list(ans$posXY, names(avgSS)))
+        cbind(ans, y)
+      }
+    )
+  )
+  newDataSS = do.call("rbind", byLocation)
+  return(newDataSS)
+}
+
+```
+
+# Reshape Test Data Keeping only the flowing variables, "posXY", "posX","posY", "orientation", "angle" 
+```{r}
+keepVars = c("posXY", "posX","posY", "orientation", "angle")
+onlineSummary = reshapeSS(data = online, varSignal = "signal", keepVars = keepVars)
+head(onlineSummary,10)
+```
+
+
+# Function Select Train Data page 33 - 34
+
+```{r}
+# Select Train Data selects the appropriate observations (based on test data orientation) from the original tall form data
+# and reformats for training the KNN algorithm
+# angleNewObs Angle  of the new observation
+# Train_data Original format of offlineSummary (Tall form) if signals
+# m the angles to include from signals 
+# Return a dataframe for training KNN algorithm 
+
+selectTrain = function(angleNewObs, train_data, m){
+  
+#Apply angle rounding 
+  
+  nearestAngle = roundOrientation(angles = angleNewObs)
+  
+
+# if angle has a remainder, of 1 round down to the nearest 45 degree angle else round up. 
+  if (m %% 2 == 1) {
+    angles = seq(-45 * (m - 1) /2, 45 * (m - 1) /2, length = m)
+  } else {
+    m = m + 1
+    angles = seq(-45 * (m - 1) /2, 45 * (m - 1) /2, length = m)
+    if (sign(angleNewObs - nearestAngle) > -1)
+      angles = angles[ -1 ]
+    else
+      angles = angles[ -m ]
+  }
+  
+  angles = angles + nearestAngle
+  angles[angles < 0] = angles[ angles < 0 ] + 360
+  angles[angles > 360] = angles[ angles > 360 ] - 360
+  
+  # Subset only those angles from original data (tall-skinny)
+  train_data_subset = train_data[train_data$angle %in% angles, ]
+  
+  # Convert to Wide and average the data for the same positions 
+  train_data_subset = reshapeSS(data = train_data_subset, varSignal = "signal")
+  
+  return(train_data_subset)
+}
+```
+
+#Calculate Nearest Neighboors 
+# Page 35 and 36 
+
+```{r}
+# Computes the distance of the new signal (single observation) to each observation in the training dataset based on Euclidian or Manhattan distance
+# newSignal is the signal value from the validation data set observation
+# trainSubset the training data to be passed 
+# Weighted default is FALSE to include weighted formula if TRUE else if False, weighted will just repeat weight of 1 for the distances
+# Returns dataframe containing same number of rows as that in the training data.
+# To calculate distance 
+#https://machinelearningmastery.com/distance-measures-for-machine-learning/#:~:text=Manhattan%20distance%20is%20calculated%20as,differences%20between%20the%20two%20vectors.&text=The%20Manhattan%20distance%20is%20related,and%20mean%20absolute%20error%20metric.
+
+findNN = function(newSignal, trainSubset, weighted=FALSE, method = Cluster_Dist) {
+  #Instead of fixing the range of the columns of the vector from 4 to 9, we will use numMacs - 1 as the column indexer
+  diffs = apply(trainSubset[ , 4:(4+numMacs-1)], 1, function(x) x - newSignal)
+  #If Euclidian distance, distance is the Mean Square Error 
+  if(method=='Euclidian')  dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) ) 
+  #If Manhattan distance is the sum of the absolute error of the measurement 
+  if(method=='Manhattan')  dists = apply(diffs, 2, function(x) sum(abs(x)) ) 
+  #Sort the distances in ascending order 
+  closest = order(dists)
+  #only return closest distances 
+  ordered_dist = dists[closest]
+  #When true, return the ordered ascending closest neighbors with weight
+  if(weighted == TRUE){
+    weight = weightFormula(ordered_dist)
+  }
+  #If false, return all equal weights of 1
+  if(weighted == FALSE){
+    weight = rep(1, length(dists))
+  }
+  return(cbind(trainSubset[closest, 1:3], ordered_dist, weight))
+}
+```
+
+#Page 35
+# The following code is credited to https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
+
+```{r}
+# XY Prediction for a single value of k neighboors
+# newSignals the signal values for the validation data for each observation
+# newAngles the orientation of the validation data for each observation
+# trainData the training data to be used
+# numAngles number of closest reference angles to include in the data
+# k  predicton for num neighbors = k
+# weighted default FALSE, include weighted distance
+# Returns dataframe with n rows  = number of (validation) observations and n columns = 2 
+# Each row is the  prediction of the mean X and Y values for that observation
+predXY = function(newSignals, newAngles, trainData, numAngles = 1, k = 3, weighted=FALSE){
+  closeXY = list(length = nrow(newSignals))
+  for (i in 1:nrow(newSignals)) {
+    trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
+    closeXY[[i]] = findNN(
+      newSignal = as.numeric(newSignals[i, ]),
+      trainSubset = trainSS,
+      weighted = weighted
+    )
+  }
+  #PG 40, not use CUMSUM function 
+  # Returns the k-means observation based on weights for a single observation 
+  # df Dataframe containing 5 columns , XY, X, Y, Distance, Inverse Distance
+  # k sorted nearest neighboors list to calculate weight 
+  # A pair of XY weighted means values for k number of neighbors
+  k_means_single_obs = function(df, k){
+    weights = df[1:k, 5]
+    weighted_x = sum(df[1:k, 2] * weights) / sum(weights)
+    weighted_y = sum(df[1:k, 3] * weights) / sum(weights)
+    return(c(weighted_x, weighted_y))
+  }
+  
+  estXY = lapply(closeXY, k_means_single_obs, k)
+  estXY = do.call("rbind", estXY)
+  return(estXY)
+}
+```
+
+```{r}
+calcError = function(estXY, actualXY, method = Cluster_Dist){
+  if('numeric' %in% class(estXY)) rows = 1 else rows = nrow(estXY)
+  if(method == 'Euclidean')  error = sqrt(sum(rowSums((estXY - actualXY)^2)))/rows
+  if(method == 'Manhattan')  error = sum(rowSums(abs(estXY - actualXY)))/rows
+  return(error)
+}
+```
+
+
+# K-Fold 
+
+## Setup
+
+```{r}
+set.seed(959)
+K = 3
+#subset size
+v = 11
+```
+
+
+#Page 37
+```{r}
+permuteLocs = sample(unique(offline$posXY))
+permuteLocs = matrix(permuteLocs, ncol = v, nrow = floor(length(permuteLocs)/v))
+permuteLocs
+```
+#Page 38
+```{r}
+onlineFold = subset(offline, posXY %in% permuteLocs[ , 1])
+head(onlineFold)
+```
+#PG 38
+```{r}
+# For reference
+head(onlineSummary)
+```
+#PG 38
+```{r}
+keepVars = c("posXY", "posX","posY", "orientation", "angle")
+onlineCVSummary = reshapeSS(offline, keepVars = keepVars, sampleAngle = TRUE)
+head(onlineCVSummary,01)
+```
+
+```{r}
+# First Fold (validation)
+onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
+head(onlineFold)
+```
+
+```{r}
+# First Fold (Train)
+offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
+head(offlineFold)
+```
+#PG 38
+```{r}
+estFold = predXY(
+  newSignals = onlineFold[ , 6:(6+numMacs-1)],
+  newAngles = onlineFold[ , 4],
+  offlineFold,
+  numAngles = 6,
+  k = 13
+)
+```
+#Then we find the error in our estimates
+#Page 38
+```{r}
+actualFold = onlineFold[ , c("posX", "posY")]
+calcError(estFold, actualFold)
+```
+
+
+
