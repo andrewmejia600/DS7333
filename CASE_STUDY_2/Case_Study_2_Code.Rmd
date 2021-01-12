@@ -1,5 +1,5 @@
 ---
-title: "Case_Study_1"
+title: "Case_Study_2"
 author: "Andrew Mejia"
 date: "`r Sys.time()`"
 output:
@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # The following code has been adopted from the text book 
+# NOLAN, D. (2017). DATA SCIENCE IN R: A case studies approach to computational reasoning and problem solving. Place of publication not identified: CRC Press.
 # https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
 # and class room starter code 
 ```{r}
@@ -32,6 +33,7 @@ library(flexclust)
 ```
 
 ## Clustering Distance and Mac Addresses of interest
+## Since we are running this experiment over multiple loops, variable macAddressInt will be changed to include :c0 and :cd
 ```{r}
 #Clustering Distance methods 
 Cluster_Dist = 'Manhattan'
@@ -42,7 +44,7 @@ weightFormula = function(x){ 1/(x)}
 
 # Required MAC Addresses of interest 
 macAddressInt = c(
-  '00:0f:a3:39:e1:c0', #Exclude from list
+  #'00:0f:a3:39:e1:c0', #Exclude from list
   '00:0f:a3:39:dd:cd',
   '00:14:bf:b1:97:8a',
   '00:14:bf:3b:c7:c6',
@@ -56,7 +58,9 @@ macAddressInt = c(
 ## This is the directory of the data f_paths passed out during class. 
 ```{r}
 offline_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/Case_Study_1/offline.final.trace.txt"
+#offline_f_path = "C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/offline.final.trace.txt"
 online_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/Case_Study_1/online.final.trace.txt"
+#online_f_path = "C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/online.final.trace.txt"
 ```
 
 # The following function are from the starter code to process the raw data 
@@ -197,6 +201,7 @@ reshapeSS = function(data, varSignal = "signal", keepVars = c("posXY", "posX", "
         #page 38 to select one angle at random for each location
         if (sampleAngle) x = x[x$angle == sample(refs, size = 1), ]
         ans = x[1, keepVars]
+        #page 38, we impute from the the mean the missing values 
         avgSS = tapply(x[ , varSignal ], x$mac, mean)
         y = matrix(avgSS, nrow = 1, ncol = numMacs,
         dimnames = list(ans$posXY, names(avgSS)))
@@ -358,6 +363,8 @@ calcError = function(estXY, actualXY, method = Cluster_Dist){
 
 ## Setup
 
+#Page 36
+
 ```{r}
 set.seed(959)
 K = 20
@@ -372,6 +379,7 @@ permuteLocs = sample(unique(offline$posXY))
 permuteLocs = matrix(permuteLocs, ncol = v, nrow = floor(length(permuteLocs)/v))
 permuteLocs
 ```
+
 #Page 38
 ```{r}
 onlineFold = subset(offline, posXY %in% permuteLocs[ , 1])
@@ -388,34 +396,108 @@ keepVars = c("posXY", "posX","posY", "orientation", "angle")
 onlineCVSummary = reshapeSS(offline, keepVars = keepVars, sampleAngle = TRUE)
 head(onlineCVSummary,01)
 ```
-
+#PG 38
 ```{r}
 # First Fold (validation)
 onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
 head(onlineFold)
 ```
-
+#PG 38
 ```{r}
 # First Fold (Train)
 offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
 head(offlineFold)
 ```
+
+```{r}
+
+```
+
+
 #PG 38
 ```{r}
 estFold = predXY(
   newSignals = onlineFold[ , 6:(6+numMacs-1)],
   newAngles = onlineFold[ , 4],
   offlineFold,
-  numAngles = 6,
-  k = 13
+  numAngles = 3,
+  k = 6
 )
 ```
+
 #Then we find the error in our estimates
 #Page 38
 ```{r}
 actualFold = onlineFold[ , c("posX", "posY")]
 calcError(estFold, actualFold)
 ```
+#To run the experiment 
+#Page 39
 
+```{r}
+K=20
+err = rep(0,K)
+numAngles = 1
+
+onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
+offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
+actualFold = onlineFold[ , c("posX", "posY")]
+for (k in 1:K) {
+  estFold = predXY(newSignals = onlineFold[ , 6:11], newAngles = onlineFold[ , 4], offlineFold, numAngles = numAngles, k = k)
+  err[k] = err[k] + calcError(estFold, actualFold)
+}
+plot(err, type="b", xlab="k-value", ylab="Error")
+```
+#PG 39
+```{r}
+K=20
+err = rep(0,K)
+numAngles = 2
+
+onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
+offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
+actualFold = onlineFold[ , c("posX", "posY")]
+for (k in 1:K) {
+  estFold = predXY(newSignals = onlineFold[ , 6:11], newAngles = onlineFold[ , 4], offlineFold, numAngles = numAngles, k = k)
+  err[k] = err[k] + calcError(estFold, actualFold)
+}
+plot(err, type="b", xlab="k-value", ylab="Error")
+```
+#PG 39
+```{r}
+K=20
+err = rep(0,K)
+numAngles = 3
+
+onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
+offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
+actualFold = onlineFold[ , c("posX", "posY")]
+for (k in 1:K) {
+  estFold = predXY(newSignals = onlineFold[ , 6:11], newAngles = onlineFold[ , 4], offlineFold, numAngles = numAngles, k = k)
+  err[k] = err[k] + calcError(estFold, actualFold)
+}
+plot(err, type="b", xlab="k-value", ylab="Error")
+```
+
+#PG 39
+```{r}
+#WARNING:  this code chunk takes a prohibitively long time to run...  suggest breaking down into smaller separate chunks
+K=20
+err = rep(0,K)
+
+for (j in 1:v) {
+  onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , j])
+  offlineFold = subset(offline, posXY %in% permuteLocs[ , -j])
+  actualFold = onlineFold[ , c("posX", "posY")]
+  
+  for (k in 1:K){
+    estFold = predXY(newSignals = onlineFold[ , 6:11], newAngles = onlineFold[ , 4], offlineFold, numAngles = 3, k = k)
+    err[k] = err[k] + calcError(estFold, actualFold)
+  }
+}
+
+plot(err, type="b", xlab="k-value", ylab="Error")
+
+```
 
 
