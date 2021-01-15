@@ -482,8 +482,8 @@ estFold = predXY(
   newSignals = onlineFold[ , 6:(6+numMacs-1)],
   newAngles = onlineFold[ , 4],
   offlineFold,
-  numAngles = 3,
-  k = 6
+  numAngles = 2,
+  k = 3
 )
 ```
 #Then we find the error in our estimates
