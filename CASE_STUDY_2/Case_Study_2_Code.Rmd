@@ -366,6 +366,7 @@ calcError = function(estXY, actualXY, method = Cluster_Dist){
 #Page 37
 ```{r}
 #subset size
+set.seed(959)
 v = 11
 permuteLocs = sample(unique(offline$posXY))
 permuteLocs = matrix(permuteLocs, ncol = v, nrow = floor(length(permuteLocs)/v))
@@ -376,7 +377,7 @@ permuteLocs
 The following code will investigate our three MAC scenarios. 1) Drop 00:0f:a3:39:e1:c0 and keep the rest, 2) Drop 00:0f:a3:39:dd:cd and keep the rest, and 3) Keep all MAC addresses.  We'll also evaluate whether looking for up to 3 angles for prediction purposes aids in finding a better prediction.
 ```{r}
 #Iterate through the MAC scenarios and generate the elbow plot while also checking for the best number of angles
-set.seed(959)
+
 K=20
 noAngles = 3
 v == 11
