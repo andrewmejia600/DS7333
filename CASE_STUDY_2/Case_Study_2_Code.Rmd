@@ -1,6 +1,6 @@
 ---
-title: "Case_Study_1"
-author: "Andrew Mejia__"
+title: "Case_Study_2_Code"
+author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
 date: "`r Sys.time()`"
 output:
   html_document:
@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # The following code has been adopted from the text book 
+# NOLAN, D. (2017). DATA SCIENCE IN R: A case studies approach to computational reasoning and problem solving. Place of publication not identified: CRC Press.
 # https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
 # and class room starter code 
 ```{r}
@@ -28,9 +29,11 @@ library(tidyverse)
 library(magrittr)
 library(plotly)
 library(DT)
+library(flexclust)
 ```
 
 ## Clustering Distance and Mac Addresses of interest
+## Since we are running this experiment over multiple loops, variable macAddressInt will be changed to include :c0 and :cd
 ```{r}
 #Clustering Distance methods 
 Cluster_Dist = 'Manhattan'
@@ -41,7 +44,7 @@ weightFormula = function(x){ 1/(x)}
 
 # Required MAC Addresses of interest 
 macAddressInt = c(
-  '00:0f:a3:39:e1:c0', #Exclude from list
+  #'00:0f:a3:39:e1:c0', #Exclude from list
   '00:0f:a3:39:dd:cd',
   '00:14:bf:b1:97:8a',
   '00:14:bf:3b:c7:c6',
@@ -54,8 +57,10 @@ macAddressInt = c(
 
 ## This is the directory of the data f_paths passed out during class. 
 ```{r}
-offline_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/Case_Study_1/offline.final.trace.txt"
-online_f_path = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/Case_Study_1/online.final.trace.txt"
+offline_f_path = "/home/andrew/Desktop/DS7333/offline.final.trace.txt"
+#offline_f_path = "C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/offline.final.trace.txt"
+online_f_path = "/home/andrew/Desktop/DS7333/online.final.trace.txt"
+#online_f_path = "C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/online.final.trace.txt"
 ```
 
 # The following function are from the starter code to process the raw data 
@@ -182,8 +187,7 @@ length(unique(online$posXY))
 
 # Function (Reshape) page 33
 ```{r}
-# Unlike text example, we will initialize sampleAngle as false, so we do not select a sample of angles, if True, the ans x will take a randon sample from the 45 degree angles. This sampling technique was borrowed from 
-#https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
+# Unlike text example, we will initialize sampleAngle as false, so we do not select a sample of angles, if True, the ans x will take a random sample from the 45 degree angles increments (pg 38). This sampling technique was borrowed from page 38. 
 
 reshapeSS = function(data, varSignal = "signal", keepVars = c("posXY", "posX", "posY"), sampleAngle = FALSE) {
   refs = seq(0, by = 45, length = 8)
@@ -194,8 +198,10 @@ reshapeSS = function(data, varSignal = "signal", keepVars = c("posXY", "posX", "
       data,
       list(posXY),
       function(x) {
+        #page 38 to select one angle at random for each location
         if (sampleAngle) x = x[x$angle == sample(refs, size = 1), ]
         ans = x[1, keepVars]
+        #page 38, we impute from the the mean the missing values 
         avgSS = tapply(x[ , varSignal ], x$mac, mean)
         y = matrix(avgSS, nrow = 1, ncol = numMacs,
         dimnames = list(ans$posXY, names(avgSS)))
@@ -272,9 +278,11 @@ selectTrain = function(angleNewObs, train_data, m){
 # To calculate distance 
 #https://machinelearningmastery.com/distance-measures-for-machine-learning/#:~:text=Manhattan%20distance%20is%20calculated%20as,differences%20between%20the%20two%20vectors.&text=The%20Manhattan%20distance%20is%20related,and%20mean%20absolute%20error%20metric.
 
+
 findNN = function(newSignal, trainSubset, weighted=FALSE, method = Cluster_Dist) {
   #Instead of fixing the range of the columns of the vector from 4 to 9, we will use numMacs - 1 as the column indexer
   diffs = apply(trainSubset[ , 4:(4+numMacs-1)], 1, function(x) x - newSignal)
+  # The following code is credited to https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
   #If Euclidian distance, distance is the Mean Square Error 
   if(method=='Euclidian')  dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) ) 
   #If Manhattan distance is the sum of the absolute error of the measurement 
@@ -296,7 +304,7 @@ findNN = function(newSignal, trainSubset, weighted=FALSE, method = Cluster_Dist)
 ```
 
 #Page 35
-# The following code is credited to https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
+# The following code is adopted and credited to https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
 
 ```{r}
 # XY Prediction for a single value of k neighboors
@@ -318,15 +326,20 @@ predXY = function(newSignals, newAngles, trainData, numAngles = 1, k = 3, weight
       weighted = weighted
     )
   }
-  #PG 40, not use CUMSUM function 
+  #PG 40, not use CUMSUM function, use weighted mean
   # Returns the k-means observation based on weights for a single observation 
   # df Dataframe containing 5 columns , XY, X, Y, Distance, Inverse Distance
   # k sorted nearest neighboors list to calculate weight 
   # A pair of XY weighted means values for k number of neighbors
+  
+  #Calculate the weigheted mean 
+  #https://www.mathsisfun.com/data/weighted-mean.html
+  # The following code is adopted and credited to https://github.com/ngupta23/ds7333_qtw/tree/master/case_study_1/submission_Kannan_Moro_Gupta/code
   k_means_single_obs = function(df, k){
     weights = df[1:k, 5]
-    weighted_x = sum(df[1:k, 2] * weights) / sum(weights)
-    weighted_y = sum(df[1:k, 3] * weights) / sum(weights)
+    weighted_x = weighted.mean(df[1:k,2],weights)
+    weighted_y = weighted.mean(df[1:k,3],weights)
+    
     return(c(weighted_x, weighted_y))
   }
   
@@ -350,64 +363,240 @@ calcError = function(estXY, actualXY, method = Cluster_Dist){
 
 ## Setup
 
-```{r}
-set.seed(959)
-K = 20
-#subset size
-v = 11
-```
-
-
 #Page 37
 ```{r}
+#subset size
+v = 11
 permuteLocs = sample(unique(offline$posXY))
 permuteLocs = matrix(permuteLocs, ncol = v, nrow = floor(length(permuteLocs)/v))
 permuteLocs
 ```
-#Page 38
-```{r}
-onlineFold = subset(offline, posXY %in% permuteLocs[ , 1])
-head(onlineFold)
-```
-#PG 38
-```{r}
-# For reference
-head(onlineSummary)
-```
-#PG 38
-```{r}
-keepVars = c("posXY", "posX","posY", "orientation", "angle")
-onlineCVSummary = reshapeSS(offline, keepVars = keepVars, sampleAngle = TRUE)
-head(onlineCVSummary,01)
-```
 
-```{r}
-# First Fold (validation)
-onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[ , 1])
-head(onlineFold)
-```
 
+The following code will investigate our three MAC scenarios. 1) Drop 00:0f:a3:39:e1:c0 and keep the rest, 2) Drop 00:0f:a3:39:dd:cd and keep the rest, and 3) Keep all MAC addresses.  We'll also evaluate whether looking for up to 3 angles for prediction purposes aids in finding a better prediction.
 ```{r}
-# First Fold (Train)
-offlineFold = subset(offline, posXY %in% permuteLocs[ , -1])
-head(offlineFold)
-```
-#PG 38
-```{r}
-estFold = predXY(
-  newSignals = onlineFold[ , 6:(6+numMacs-1)],
-  newAngles = onlineFold[ , 4],
-  offlineFold,
-  numAngles = 6,
-  k = 13
+#Iterate through the MAC scenarios and generate the elbow plot while also checking for the best number of angles
+set.seed(959)
+K=20
+noAngles = 3
+v == 11
+macPerms = c("Drop: 00:0f:a3:39:e1:c0","Drop: 00:0f:a3:39:dd:cd","Keep All")
+# Required MAC Addresses of interest, here we include all mac addresses 
+macAddressInt = c(
+  '00:0f:a3:39:e1:c0', #Exclude from list
+  '00:0f:a3:39:dd:cd',
+  '00:14:bf:b1:97:8a',
+  '00:14:bf:3b:c7:c6',
+  '00:14:bf:b1:97:90',
+  '00:14:bf:b1:97:8d',
+  '00:14:bf:b1:97:81'
 )
+numMacs = length(macAddressInt)
+#read the data with all mac addresses, we'll subset to remove specific mac addresses later
+offline = readData(f_path = offline_f_path, macAddressInt = macAddressInt)
+online = readData(f_path = online_f_path, macAddressInt = macAddressInt)
+
+#set mac addresses of interest
+macAddressIteration = macAddressInt
+numMacs = length(macAddressIteration)
+#used in the onlineFold creation
+keepVars = c("posXY", "posX","posY", "orientation", "angle")
+
+#create dataframe to hold results with errors
+dfResults <- data.frame("Scenario"=factor(),"AngleCount"=integer(),"K_value"=integer(),"Error"=double())
+
+for (f in 1:length(macPerms)){
+  #in this loop we need to make sure our data only consists of the mac addresses we care about
+  if (f < 3){
+    #the first two scenarios involve dropping a mac address, this logic handles that
+    print(paste0("Current Mac Scenario: ", f))
+    macAddressIteration = macAddressInt[-f]
+    numMacs = length(macAddressIteration)
+  }else{
+    print(paste0("Current Mac Scenario: ", f))
+    macAddressIteration = macAddressInt
+    numMacs = length(macAddressIteration)
+  }
+  offlineIt = subset(offline, mac %in% macAddressIteration)
+  onlineIt = subset(online, mac %in% macAddressIteration)
+  onlineCVSummary = reshapeSS(offlineIt, keepVars = keepVars, sampleAngle = TRUE)
+  for (a in 1:noAngles){
+    print(paste0("     Current number of angles: ", a))
+    for (j in 1:v){
+      #create folds for cross validation  
+      print(paste0("          Current crossfold: ", j))
+      onlineFold = subset(onlineCVSummary, posXY %in% permuteLocs[,j])
+      if(f==3){print(paste0("          onlinefold created: ", j))}
+      offlineFold = subset(offlineIt, posXY %in% permuteLocs[,-j])
+      if(f==3){print(paste0("          offlinefold created: ", j))}
+      actualFold = onlineFold[, c("posX","posY")]
+      if(f==3){print(paste0("          actualfold created: ", j))}
+
+      for (i in 1:K){
+          if(f<3){
+            estFold = predXY(newSignals = onlineFold[, 6:11], newAngles = onlineFold[, 4], offlineFold, numAngles = a, k = i)
+          }else{
+            estFold = predXY(newSignals = onlineFold[, 6:12], newAngles = onlineFold[, 4], offlineFold, numAngles = a, k = i)
+          }
+          myError = calcError(estFold, actualFold)
+          print(paste0("               estimation and error calculated: ", i))
+          if((f==1)&(a==1)&(j==1)&(i==1)){
+            print(paste0("                    first time loading results K: ", i))
+            dfResults <- data.frame("Scenario"=macPerms[f], "AngleCount"=a, "K_value"=i,"Error"=myError)
+          }else{
+            print(paste0("                    subsequent times loading results K: ", i))
+            dfRow <- data.frame("Scenario"=macPerms[f], "AngleCount"=a, "K_value"=i,"Error"=myError)
+            dfResults <- rbind(dfResults, dfRow)
+          }
+        
+        }
+
+      }
+      
+    }
+}
+
+
 ```
-#Then we find the error in our estimates
-#Page 38
+
+
 ```{r}
-actualFold = onlineFold[ , c("posX", "posY")]
-calcError(estFold, actualFold)
+#write.csv(dfResults,"C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/cv_results.csv", row.names = FALSE)
+write.csv(dfResults,"/home/andrew/Desktop/DS7333/cv_results.csv", row.names = FALSE)
+dfResults
 ```
 
-####COMMENTS ### BELOW###
+```{r}
 
+```
+
+```{r}
+library(ggplot2)
+#dfResults = read.csv("C:/Users/BGaither/OneDrive - McAfee/Other/school/SMU/Courses/Spring 2021/Quantifying The World/Case Study 2/Data/cv_results.csv",header = TRUE)
+#dfResGroup = dfResults %>% filter(AngleCount==3) %>% group_by(Scenario, AngleCount, K_value) %>% summarize(Error_Avg = mean(Error))
+dfResults$AngleCount <- as.factor(dfResults$AngleCount)
+dfResGroup = dfResults %>% group_by(Scenario, AngleCount, K_value) %>% summarize(Error_Avg = mean(Error))
+#Individual aes() …. an aesthetic for each layer
+ggplot(data = dfResGroup) + 
+geom_line(mapping = aes(x=K_value, y=Error_Avg, color=AngleCount), size=1.2) + facet_grid(rows=vars(AngleCount), cols=vars(Scenario)) + theme_classic() + labs(title="Error Elbow Curve by Scenario")
+```
+
+```{r}
+dfResultsGroupMin = dfResGroup %>% group_by(Scenario, AngleCount) %>% summarize(Error_Avg = min(Error_Avg))
+dfOptK = merge(dfResGroup, dfResultsGroupMin, by=c("Scenario", "AngleCount", "Error_Avg"))
+dfOptK
+```
+
+```{r}
+ggplot(dfResults) + geom_boxplot(mapping = aes(x=Scenario, y=Error)) + facet_grid(rows=vars(AngleCount)) + theme_classic() + labs(title="Boxplot of Error by Scenario by Numer of Angles")
+```
+From the boxplot, we can see that there are some extreme error values when dropping 00:0f:a3:39:dd:cd.  Let's check dropping 00:0f:a3:39:e1:c0 and do an end to end analysis.
+```{r}
+
+macAddressInt = c(
+  #'00:0f:a3:39:e1:c0', #Exclude from list
+  '00:0f:a3:39:dd:cd',
+  '00:14:bf:b1:97:8a',
+  '00:14:bf:3b:c7:c6',
+  '00:14:bf:b1:97:90',
+  '00:14:bf:b1:97:8d',
+  '00:14:bf:b1:97:81'
+)
+numMacs = length(macAddressInt)
+
+offlineIt = subset(offline, mac %in% macAddressInt)
+onlineIt = subset(online, mac %in% macAddressInt)
+keepVars = c("posXY", "posX","posY", "orientation", "angle")
+onlineCVSummary = reshapeSS(offlineIt, keepVars = keepVars, sampleAngle = TRUE)
+
+i=6
+noAngles = 1
+
+actualLocation = onlineCVSummary[ , c("posX", "posY")]
+estLocation = predXY(newSignals = onlineCVSummary[ , 6:11], newAngles = onlineCVSummary[ , 4], offlineIt, numAngles = noAngles, k = i)
+locError =  calcError(estLocation, actualLocation)
+
+locError
+```
+Let's check the actual locations and then we'll compare the predicted locations for spot check.
+```{r}
+actualLocation
+```
+
+Below we have the predicted locations, we do see that most predictions are in the ball park, however it's not perfect.
+```{r}
+dfEstLoc = as.data.frame(estLocation)
+names(dfEstLoc)[names(dfEstLoc)=="V1"] <-"posX"
+names(dfEstLoc)[names(dfEstLoc)=="V2"] <-"posY"
+dfEstLoc
+```
+
+Let's take a look at what the predicted versus actual locations look like plotted out.
+```{r}
+ggplot(actualLocation,aes(posX,posY)) + 
+geom_point(size=1.2) + geom_point(data=dfEstLoc, color="blue")+ theme_classic() + labs(title="Actual Location versus Predicted Location")
+```
+
+Now, we will reduce it to just 5 observations to get a closer look.
+```{r}
+ggplot(head(actualLocation),aes(posX,posY)) + 
+geom_point(size=1.2) + geom_point(data=head(dfEstLoc), color="blue")+ theme_classic() + labs(title="Actual Location versus Predicted Location for 5 Observations")+ xlim(0, 35)
+```
+
+Now, the next best scenario appears to be including 3 angles and keeping all MAC addresses. Let's take this through an end to end analysis.
+From the boxplot, we can see that there are some extreme error values when dropping 00:0f:a3:39:dd:cd.  Let's check dropping 00:0f:a3:39:e1:c0 and do an end to end analysis.
+```{r}
+
+macAddressInt = c(
+  '00:0f:a3:39:e1:c0', #Exclude from list
+  '00:0f:a3:39:dd:cd',
+  '00:14:bf:b1:97:8a',
+  '00:14:bf:3b:c7:c6',
+  '00:14:bf:b1:97:90',
+  '00:14:bf:b1:97:8d',
+  '00:14:bf:b1:97:81'
+)
+numMacs = length(macAddressInt)
+
+offlineIt = subset(offline, mac %in% macAddressInt)
+onlineIt = subset(online, mac %in% macAddressInt)
+keepVars = c("posXY", "posX","posY", "orientation", "angle")
+onlineCVSummary = reshapeSS(offlineIt, keepVars = keepVars, sampleAngle = TRUE)
+
+i=6
+noAngles = 1
+
+actualLocation = onlineCVSummary[ , c("posX", "posY")]
+estLocation = predXY(newSignals = onlineCVSummary[ , 6:12], newAngles = onlineCVSummary[ , 4], offlineIt, numAngles = noAngles, k = i)
+locError =  calcError(estLocation, actualLocation)
+
+locError
+```
+
+Let's check the actual locations and then we'll compare the predicted locations for spot check.
+```{r}
+actualLocation
+```
+
+Below we have the predicted locations, we do see that most predictions are in the ball park, however it's not perfect.
+```{r}
+dfEstLoc = as.data.frame(estLocation)
+names(dfEstLoc)[names(dfEstLoc)=="V1"] <-"posX"
+names(dfEstLoc)[names(dfEstLoc)=="V2"] <-"posY"
+dfEstLoc
+```
+
+Let's take a look at what the predicted versus actual locations look like plotted out.
+```{r}
+ggplot(actualLocation,aes(posX,posY)) + 
+geom_point(size=1.2) + geom_point(data=dfEstLoc, color="blue")+ theme_classic() + labs(title="Actual Location versus Predicted Location")
+```
+
+Now, we will reduce it to just 5 observations to get a closer look.
+```{r}
+ggplot(head(actualLocation),aes(posX,posY)) + 
+geom_point(size=1.2) + geom_point(data=head(dfEstLoc), color="blue")+ theme_classic() + labs(title="Actual Location versus Predicted Location for 5 Observations")+ xlim(0, 35)
+```
+
+#Conclusion
+The conclusion of this analysis is dropping the MAC address 00:0f:a3:39:e1:c0 and using only 1 angle with an optimal k value of 6. This is recommended as it’s the simplest approach and results in the most accurate prediction.   
