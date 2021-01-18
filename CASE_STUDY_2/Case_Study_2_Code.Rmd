@@ -1,6 +1,6 @@
 ---
 title: "Case_Study_1"
-author: "Andrew Mejia"
+author: "Andrew Mejia__"
 date: "`r Sys.time()`"
 output:
   html_document:
@@ -409,5 +409,5 @@ actualFold = onlineFold[ , c("posX", "posY")]
 calcError(estFold, actualFold)
 ```
 
-
+####COMMENTS ### BELOW###
 
