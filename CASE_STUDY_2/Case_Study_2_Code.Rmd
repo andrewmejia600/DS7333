@@ -467,9 +467,6 @@ write.csv(dfResults,"/home/andrew/Desktop/DS7333/cv_results.csv", row.names = FA
 dfResults
 ```
 
-```{r}
-
-```
 
 ```{r}
 library(ggplot2)
@@ -489,7 +486,7 @@ dfOptK
 ```
 
 ```{r}
-ggplot(dfResults) + geom_boxplot(mapping = aes(x=Scenario, y=Error)) + facet_grid(rows=vars(AngleCount)) + theme_classic() + labs(title="Boxplot of Error by Scenario by Numer of Angles")
+ggplot(dfResults) + geom_boxplot(mapping = aes(x=Scenario, y=Error)) + facet_grid(rows=vars(AngleCount)) + theme_classic() + labs(title="Boxplot of Error by Scenario by Number of Angles")
 ```
 From the boxplot, we can see that there are some extreme error values when dropping 00:0f:a3:39:dd:cd.  Let's check dropping 00:0f:a3:39:e1:c0 and do an end to end analysis.
 ```{r}
