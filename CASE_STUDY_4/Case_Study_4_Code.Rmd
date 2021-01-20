@@ -55,12 +55,14 @@ extractResTable =
       pres = getNodeSet(div1[[1]], "//pre")
       els = sapply(pres, xmlValue)
     }
+    
     else if (year == 1999 & sex == "male") { # have to add this else if statement
       # Get preformatted text from <pre> elements
       pres = getNodeSet(doc, "//pre")
       txt = xmlValue(pres[[1]])
       els = strsplit(txt, "\n")[[1]]   
     } 
+    
     else {
       # Get preformatted text from <pre> elements
       pres = getNodeSet(doc, "//pre")
@@ -132,4 +134,43 @@ df_female_2006 <- extractResTable(url = "http://www.cherryblossom.org/results/20
 
 df_female_2006[1:10]
 df_male_2006[1:10]
+```
+
+```{r}
+#### Corrected URLS from new website
+womenURLs = 
+  c("results/1999/cb99f.html",
+    "results/2000/Cb003f.htm",
+    "results/2001/oof_f.html", 
+    "results/2002/ooff.htm", 
+    "results/2003/CB03-F.HTM", 
+    "results/2004/women.htm", 
+    "results/2005/CB05-F.htm", 
+    "results/2006/women.htm", 
+    "results/2007/women.htm", 
+    "results/2008/women.htm", 
+    "results/2009/09cucb-F.htm",
+    "results/2010/2010cucb10m-f.htm", 
+    "results/2011/2011cucb10m-f.htm", 
+    "results/2012/2012cucb10m-f.htm" 
+  )
+
+#### Paste all urls into a list 
+urls = paste(ubase, womenURLs, sep="")
+urls[1:4]
+
+
+#### Apply function from years 1999-2012 to scrape times 
+years = 1999:2012
+womenTables = mapply(extractResTable, url = urls, year = years, sex = "female")
+names(womenTables) = years
+sapply(womenTables, length)
+
+#### Confirm the format of the tables scraped 
+womenTables$'1999'[1:10]
+womenTables[[2]][1:10]
+
+save(womenTables, file = "CBWomenTextTables.rda")
+
+
 ```
