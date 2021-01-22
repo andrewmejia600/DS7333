@@ -63,6 +63,13 @@ extractResTable =
       els = strsplit(txt, "\n")[[1]]   
     } 
     
+      else if (year == 1999 & sex == "female") { # have to add this else if statement
+      # Get preformatted text from <pre> elements
+      pres = getNodeSet(doc, "//pre")
+      txt = xmlValue(pres[[1]])
+      els = strsplit(txt, "\n")[[1]]   
+    } 
+    
     else {
       # Get preformatted text from <pre> elements
       pres = getNodeSet(doc, "//pre")
