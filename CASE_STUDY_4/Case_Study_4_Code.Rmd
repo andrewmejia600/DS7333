@@ -63,6 +63,21 @@ extractResTable =
       els = strsplit(txt, "\n")[[1]]   
     } 
     
+    else if (year == 2009 & sex == "female") {
+      # Get preformatted text from <div class="Section1"> element
+      # Each line of results is in a <pre> element
+      div1 = getNodeSet(doc, "//div[@class='Section1']")
+      pres = getNodeSet(div1[[1]], "//pre")
+      els = sapply(pres, xmlValue)
+    }
+    
+    else if (year == 1999 & sex == "female") { # have to add this else if statement
+      # Get preformatted text from <pre> elements
+      pres = getNodeSet(doc, "//pre")
+      txt = xmlValue(pres[[1]])
+      els = strsplit(txt, "\n")[[1]]   
+    } 
+    
     else {
       # Get preformatted text from <pre> elements
       pres = getNodeSet(doc, "//pre")
@@ -134,9 +149,18 @@ df_female_2006 <- extractResTable(url = "http://www.cherryblossom.org/results/20
 
 df_female_2006[1:10]
 df_male_2006[1:10]
+
+df_male_1999 <- extractResTable(url = "http://www.cherryblossom.org/results/1999/Cb99m.html", year = 1999, sex = "male", file = NULL)
+df_female_1999 <- extractResTable(url = "http://www.cherryblossom.org/results/1999/Cb99f.html", year = 1999, sex = "female", file = NULL)
+
+df_female_1999[1:10]
+df_male_1999[1:10]
 ```
 
 ```{r}
+### Base line url to be pasted 
+ubase = "http://www.cherryblossom.org/"
+
 #### Corrected URLS from new website
 womenURLs = 
   c("results/1999/cb99f.html",
@@ -174,3 +198,15 @@ save(womenTables, file = "CBWomenTextTables.rda")
 
 
 ```
+
+```{r}
+load(file="CBWomenTextTables.rda")
+```
+
+```{r}
+womenTables[1]
+
+```
+
+
+
