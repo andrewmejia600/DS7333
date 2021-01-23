@@ -19,6 +19,7 @@ always_allow_html: yes
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ```{r}
 library(tidyverse)
 library(hms)
@@ -31,6 +32,8 @@ library(progress)
 library(doParallel)
 library(doSNOW)
 library(dplyr)
+library(ggplot2)
+library(hexbin)
 ```
 
 ```{r}
@@ -165,3 +168,114 @@ library(doSNOW)
 ```{r}
 Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
 ```
+
+```{r}
+head(Women_table)
+```
+
+```{r}
+dfWomen = transform(Women_table, Race = as.factor(Race),Age = as.integer(Age), Hometown = as.factor(Hometown), year = as.factor(year) )
+head(dfWomen)
+```
+```{r}
+summary(dfWomen)
+```
+We evaluate how many null values are in Age = 20 null ages
+```{r}
+print(dim(dfWomen[is.na(dfWomen$Age),])[1])
+```
+
+Upon examining the null age records, it doesn't appear to be a data ingestion issue, we'll drop these records
+```{r}
+dfWomen %>% filter(is.na(Age))
+```
+Dropping the 20 records with null ages as it's not going to help our analysis
+```{r}
+dfWomen = dfWomen %>% filter(!is.na(Age))
+```
+
+```{r}
+f = ggplot(dfWomen)
+f + geom_boxplot(mapping = aes(x=year, y=Age)) + theme_classic() + labs(title="Boxplot of Age by Year")
+
+```
+Let's take a look at the one runner with the low age in 2009, it appears to be legitimate
+```{r}
+dfWomen %>% filter(Age < 10)
+```
+
+Next, we need to convert Time into minutes
+```{r}
+#first, separate time into three different columns (h, m, ss)
+df = dfWomen
+df = separate(df, Time, c("Hours","Minutes","Seconds"),":", remove=FALSE, convert=TRUE, fill="warn")
+head(df)
+```
+
+```{r}
+df$TimeMinutes = (df$Hours * 60) + df$Minutes + (df$Seconds/60)
+head(df)
+```
+
+
+```{r}
+ggplot(df, aes(x = Age, y=TimeMinutes)) + 
+  geom_hex() +
+  theme_bw() + 
+  labs(title="Scatter Plot of Female Runners:  Age vs Time in Minutes")
+
+```
+
+```{r}
+df$AgeBin = cut(df$Age, breaks=c(0,5,15,25,35,45,55,65,75,85,95),labels=c("1-5","6-15","16-25","26-35","36-45","46-55","56-65","66-75","76-85","86-95"))
+head(df)
+```
+
+Let's take a look at age groups and their relationship to running time
+```{r}
+f = ggplot(df)
+f + geom_boxplot(mapping = aes(x=AgeBin, y=TimeMinutes)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
+```
+Let's fit a linear regression model looking at running time as a function of age.  The lm function performs least squares to find the best fitting line to our data
+```{r}
+lmAge = lm(TimeMinutes ~ Age, data = df)
+lmAge$coefficients
+```
+
+```{r}
+summary(lmAge)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
