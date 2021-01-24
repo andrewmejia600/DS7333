@@ -194,8 +194,6 @@ tableTransform =function(data_df){
 }
 ```
 
-#strptime(durations, format='%H:%M:%S')
-#v1$hour * 3600 + v1$min * 60 + v1$sec
 
 
 ### Perform Scrape ### 
