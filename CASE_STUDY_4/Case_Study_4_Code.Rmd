@@ -209,12 +209,21 @@ Next, we need to convert Time into minutes
 #first, separate time into three different columns (h, m, ss)
 df = dfWomen
 df = separate(df, Time, c("Hours","Minutes","Seconds"),":", remove=FALSE, convert=TRUE, fill="warn")
+
+#next, we calculate the number of minutes into a new colume called TimeMinutes
+df$TimeMinutes = (df$Hours * 60) + df$Minutes + (df$Seconds/60)
 head(df)
 ```
 
+Saving the dataframe for later retrieval
 ```{r}
-df$TimeMinutes = (df$Hours * 60) + df$Minutes + (df$Seconds/60)
-head(df)
+#write.csv(df,"C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", row.names = FALSE)
+```
+
+load the data if necessary
+```{r}
+file_path = "C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv"
+df = read.csv(file_path, header=TRUE)
 ```
 
 
@@ -236,6 +245,75 @@ Let's take a look at age groups and their relationship to running time
 f = ggplot(df)
 f + geom_boxplot(mapping = aes(x=AgeBin, y=TimeMinutes)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
 ```
+let's create a new column to hold the pace per mile
+```{r}
+df$PaceMinutes = (df$TimeMinutes/10)
+df$PaceBin = cut(df$PaceMinutes, breaks=c(0,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,18), 
+                 labels=c("1-5","5.1-5.5","5.5-6","6-6.5","6.5-7","7-7.5","7.5-8","8-8.5","8.5-9","9-9.5","9.5-10","10-10.5","10.5-11","11-18"))
+```
+
+
+```{r}
+library(plyr)
+
+mu <- ddply(df, "year", summarise, grp.mean=mean(Age))
+
+p<-ggplot(df, aes(x=Age)) +
+  geom_density() +
+  facet_grid(vars(year) , scale="free_y") +
+  labs(title="Distribution of Age throughout the years")
+p
+# Add mean lines
+p+geom_vline(data=mu, aes(xintercept=grp.mean, color="red"),
+             linetype="dashed")
+
+
+```
+
+```{r}
+
+ggplot(df %>% group_by(year, PaceBin) %>% tally()) +
+  geom_col(mapping = aes(x=PaceBin, y=n)) +
+  facet_grid(vars(year))
+  
+```
+```{r}
+ggplot(df %>% group_by(year) %>% tally()) +
+  geom_col(mapping = aes(x=year, y=n)) +
+  labs(title="Volume of runners by year")
+```
+```{r}
+dfRunVol = df %>% group_by(year) %>% tally()
+dfRunVol$year = as.integer(dfRunVol$year)
+names(dfRunVol)[2] <- "RunnerVolume"
+head(dfRunVol)
+```
+
+```{r}
+
+
+lmRunVol = lm(RunnerVolume ~ year, data = dfRunVol)
+lmRunVol$coefficients
+
+```
+
+
+```{r}
+summary(lmRunVol)
+```
+
+
+```{r}
+summary(df$PaceMinutes)
+```
+
+
+```{r}
+ggplot(df) +
+  geom_boxplot(mapping = aes(x=AgeBin))
+```
+
+
 Let's fit a linear regression model looking at running time as a function of age.  The lm function performs least squares to find the best fitting line to our data
 ```{r}
 lmAge = lm(TimeMinutes ~ Age, data = df)
@@ -246,9 +324,6 @@ lmAge$coefficients
 summary(lmAge)
 ```
 
-```{r}
-
-```
 
 ```{r}
 
