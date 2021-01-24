@@ -31,6 +31,8 @@ library(progress)
 library(doParallel)
 library(doSNOW)
 library(dplyr)
+library(states)
+library(countrycode)
 ```
 
 ```{r}
@@ -161,13 +163,45 @@ library(doSNOW)
  
 ```
 
+### The purpose of this function is to transform the raw tables from the scrape ###
 
+```{r}
+tableTransform =function(data_df){
+  dataDF = data_df %>% separate(col = 'Hometown', c('HTown', 'HState')
+                                 , sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+                                  mutate(HTown = toupper(trimws(HTown))
+                                         , HState = toupper(trimws(HState))
+                                         , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
+                                         , HState = ifelse(HState %in% c('NR', ''), NA, HState)
+                                         , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
+                                         )
+  return(dataDF)
+}
+```
+
+
+### Perform Scrape 
 ```{r}
 Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
 ```
 
 ```{r}
 men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
+
+```
+
+### Load tables from file ### 
+
+```{r}
+mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBMtableRaw.rds")
+
+womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
+```
+
+
+```{r}
+mens_table_T = tableTransform(mens_table)
+womens_table_T = tableTransform(womens_table)
 
 ```
 
