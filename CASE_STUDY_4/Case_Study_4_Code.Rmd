@@ -32,7 +32,6 @@ library(doParallel)
 library(doSNOW)
 library(dplyr)
 library(states)
-library(countrycode)
 ```
 
 ```{r}
@@ -164,23 +163,42 @@ library(doSNOW)
 ```
 
 ### The purpose of this function is to transform the raw tables from the scrape ###
+### https://stackoverflow.com/questions/50040968/convert-a-duration-hms-to-seconds ### 
+### https://stackoverflow.com/questions/10835908/is-there-a-way-to-convert-mmss-00-to-seconds-00 ### 
 
 ```{r}
 tableTransform =function(data_df){
-  dataDF = data_df %>% separate(col = 'Hometown', c('HTown', 'HState')
-                                 , sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
-                                  mutate(HTown = toupper(trimws(HTown))
-                                         , HState = toupper(trimws(HState))
-                                         , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
-                                         , HState = ifelse(HState %in% c('NR', ''), NA, HState)
-                                         , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
-                                         )
+  dataDF = data_df %>% 
+    separate(col = 'Hometown', c('HTown', 'HState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    mutate(HTown = toupper(trimws(HTown))
+           , HState = toupper(trimws(HState))
+           , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
+           , HState = ifelse(HState %in% c('NR', ''), NA, HState)
+           , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
+           , RawTime = strptime(Time, format='%H:%M:%S')
+           , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
+           , RawPace = strptime(Pace, format = "%M:%OS")
+           , RawPace_S = RawPace$min * 60 + RawPace$sec 
+           , Age = ifelse(Age %in% c("NR"), NA, Age)
+           , Age = as.numeric(Age)
+           , RawTime_S = as.numeric(RawTime_S)
+           , RawPace_S = as.numeric(RawPace_S)
+           ) %>% 
+    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    
+                  
   return(dataDF)
 }
 ```
 
 
-### Perform Scrape 
+
+### Perform Scrape ### 
+
+### Caution takes a long time without hexacore machine ### 
 ```{r}
 Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
 ```
