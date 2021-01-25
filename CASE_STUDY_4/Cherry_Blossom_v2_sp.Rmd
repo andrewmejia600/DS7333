@@ -10,12 +10,12 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Planning considerations:
-Parking accommodations
-Hotel reservations/pricing packages
-Race day support like Police, volunteers, space to physically queue up the racers to start the race
-SWAG and timing chip orders
-SWAG and bib/chip distribution
-Logistics to transition to a virtual race (Do we want to consider this piece?) around shipping everything
+ - Parking accommodations
+ - Hotel reservations/pricing packages
+ - Race day support like Police, volunteers, space to physically queue up the racers to start the race
+ - SWAG and timing chip orders
+ - SWAG and bib/chip distribution
+ - Logistics to transition to a virtual race (Do we want to consider this piece?) around shipping everything
 
 ```{r}
 #Libraries
@@ -43,6 +43,7 @@ noresults = CBWtableRaw %>% dplyr::filter(Division == "NR")
 dim(noresults)
 head(noresults)
 ```
+
 ```{r eval=FALSE, include=FALSE}
 noresults = CBWtableRaw %>% dplyr::filter(Age == "NR")
 dim(noage)
@@ -142,20 +143,7 @@ res <- hms(CBWtableRaw$Time)        # Identifying Hours, Minutes, Seconds
 CBWtableRaw$Time = hour(res)*60 + minute(res) + second(res)/60       # convert hours to minutes, add minutes, and convert seconds to minutes and add
 ```
 
-```{r}
-p =  CBWtableRaw %>% 
-      ggplot(aes(x = year, y = Time, group = year, color = year)) + 
-     geom_boxplot()
 
-ggplotly(p, tooltip="text") 
-```
-
-```{r}
-p = CBWtableRaw %>% 
-      ggplot(aes(x = year, y = Time, group = year, color = year)) + 
-     geom_boxplot() + facet_wrap(~Division)
-ggplotly(p, tooltip="text") 
-```
 
 ```{r}
 
@@ -181,8 +169,21 @@ p = plotdata %>%
   guides(fill=guide_legend(nrow=2))
 ggplotly(p, tooltip="text") 
 ```
+boxplots for medians by year
+```{r}
+p =  CBWtableRaw %>% 
+      ggplot(aes(x = year, y = Time, group = year, color = year)) + 
+     geom_boxplot()
 
-
+ggplotly(p, tooltip="text") 
+```
+looking at median time by division
+```{r}
+p = CBWtableRaw %>% 
+      ggplot(aes(x = year, y = Time, group = year, color = year)) + 
+     geom_boxplot() + facet_wrap(~Division)
+ggplotly(p, tooltip="text") 
+```
 
 ```{r}
 #predict LM
@@ -194,8 +195,10 @@ out <- loess(Time~year, data=CBWtableRaw)
 curve(predict(out, newdata=data.frame(year = x)), add=TRUE)
 ```
 
+Run a piecewise fit next
 
 
+evaluate city/state impact for recommendations for planning
 ```{r}
 #split out city and state to see in town/out of town distribution
 library(dplyr)
@@ -207,3 +210,4 @@ library(tidyr)
 #head(before, 10)
 
 ```
+
