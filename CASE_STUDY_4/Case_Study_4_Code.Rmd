@@ -177,12 +177,14 @@ tableTransform =function(data_df){
            , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
            , RawTime = strptime(Time, format='%H:%M:%S')
            , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
+           , RawTime_M = as.numeric(RawTime_S)/60
            , RawPace = strptime(Pace, format = "%M:%OS")
            , RawPace_S = RawPace$min * 60 + RawPace$sec 
            , Age = ifelse(Age %in% c("NR"), NA, Age)
            , Age = as.numeric(Age)
            , RawTime_S = as.numeric(RawTime_S)
            , RawPace_S = as.numeric(RawPace_S)
+           , RawPace_M = as.numeric(RawPace_S)/60
            ) %>% 
     separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
              ,extra='drop',remove=TRUE) %>% 
