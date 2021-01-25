@@ -17,7 +17,7 @@ Planning considerations:
  - SWAG and bib/chip distribution
  - Logistics to transition to a virtual race (Do we want to consider this piece?) around shipping everything
 
-```{r}
+```{r, warning=FALSE}
 #Libraries
 library(tidyverse)
 library(ggplot2)
