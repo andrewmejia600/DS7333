@@ -170,11 +170,20 @@ library(doSNOW)
 tableTransform =function(data_df){
   dataDF = data_df %>% 
     separate(col = 'Hometown', c('HTown', 'HState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
     mutate(HTown = toupper(trimws(HTown))
            , HState = toupper(trimws(HState))
            , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
            , HState = ifelse(HState %in% c('NR', ''), NA, HState)
            , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
+           , PiS = ifelse(trimws(PiS) %in% c('NR', ''), NA, trimws(PiS))
+           , TiS = ifelse(trimws(TiS) %in% c('NR', ''), NA, trimws(TiS))
+           , PiD = ifelse(trimws(PiD) %in% c('NR', ''), NA, trimws(PiD))
+           , TiD = ifelse(trimws(TiD) %in% c('NR', ''), NA, trimws(PiD))
+           , Division = ifelse(trimws(Division) %in% c('NR', ''), NA, trimws(Division))
            , RawTime = strptime(Time, format='%H:%M:%S')
            , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
            , RawTime_M = as.numeric(RawTime_S)/60
@@ -185,12 +194,7 @@ tableTransform =function(data_df){
            , RawTime_S = as.numeric(RawTime_S)
            , RawPace_S = as.numeric(RawPace_S)
            , RawPace_M = as.numeric(RawPace_S)/60
-           ) %>% 
-    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
-             ,extra='drop',remove=TRUE) %>% 
-    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
-             ,extra='drop',remove=TRUE) %>% 
-    
+           )
                   
   return(dataDF)
 }
@@ -224,4 +228,6 @@ mens_table_T = tableTransform(mens_table)
 womens_table_T = tableTransform(womens_table)
 
 ```
+
+####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
