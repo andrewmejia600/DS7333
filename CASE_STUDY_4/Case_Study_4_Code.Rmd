@@ -330,6 +330,14 @@ y_hat = 800.5 + (15*613.4)
 
 print(paste0("Predicted volume of runners in 2013 is: ", y_hat))
 ```
+95% confidence intervals
+```{r}
+dfNew = data.frame(year=15)
+predict(lmRunVol, newdata = dfNew, interval = 'confidence')
+```
+
+
+
 we can see below that the IQR of running times throughout the years has remained relatively constant
 ```{r}
 f = ggplot(womens_table_T)
