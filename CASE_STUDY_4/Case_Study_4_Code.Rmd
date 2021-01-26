@@ -165,36 +165,51 @@ library(doSNOW)
 ### The purpose of this function is to transform the raw tables from the scrape ###
 ### https://stackoverflow.com/questions/50040968/convert-a-duration-hms-to-seconds ### 
 ### https://stackoverflow.com/questions/10835908/is-there-a-way-to-convert-mmss-00-to-seconds-00 ### 
+### https://stackoverflow.com/questions/24173194/remove-parentheses-and-text-within-from-strings-in-r  ###
 
 ```{r}
-tableTransform =function(data_df){
+tableTransform =function(data_df, cols_to_remove){
   dataDF = data_df %>% 
-    separate(col = 'Hometown', c('HTown', 'HState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    #Seperate Home town into seperate columns
+    separate(col = 'Hometown', c('HomeTown', 'HomeState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    #Seperate PiS/TiS into seperate columns 
     separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
              ,extra='drop',remove=TRUE) %>% 
+    #Seperate PiD/TiD into seperate columns 
     separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
              ,extra='drop',remove=TRUE) %>% 
-    mutate(HTown = toupper(trimws(HTown))
-           , HState = toupper(trimws(HState))
-           , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
-           , HState = ifelse(HState %in% c('NR', ''), NA, HState)
-           , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
-           , PiS = ifelse(trimws(PiS) %in% c('NR', ''), NA, trimws(PiS))
-           , TiS = ifelse(trimws(TiS) %in% c('NR', ''), NA, trimws(TiS))
-           , PiD = ifelse(trimws(PiD) %in% c('NR', ''), NA, trimws(PiD))
-           , TiD = ifelse(trimws(TiD) %in% c('NR', ''), NA, trimws(PiD))
-           , Division = ifelse(trimws(Division) %in% c('NR', ''), NA, trimws(Division))
+    #Trim the casted upper HomeTown strings of whitespace 
+    mutate(HomeTown = toupper(trimws(HomeTown))
+           , HomeState = toupper(trimws(HomeState))
+           , HomeTown = ifelse(HomeTown %in% c('NR', '', NULL), NA, toupper(trimws(HomeTown)))
+           , HomeState = ifelse(HomeState %in% c('NR', '', NULL), NA, toupper(trimws(HomeState)))
+           #Check if HomeState is in state.abb or DC and return USA else return the HomeTown as the Country
+           , HomeCountry = ifelse(HomeState %in% c(state.abb, "DC"), "USA", HomeTown)
+           #Remove White Space
+           , PiS = ifelse(trimws(PiS) %in% c('NR', '', NULL), NA, trimws(PiS))
+           , TiS = ifelse(trimws(TiS) %in% c('NR', '', NULL), NA, trimws(TiS))
+           , PiD = ifelse(trimws(PiD) %in% c('NR', '', NULL), NA, trimws(PiD))
+           , TiD = ifelse(trimws(TiD) %in% c('NR', '', NULL), NA, trimws(TiD))
+           , Division = ifelse(trimws(Division) %in% c('NR', '', NULL), NA, trimws(Division))
+           # Normalize Time to seconds and minutes 
            , RawTime = strptime(Time, format='%H:%M:%S')
            , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
            , RawTime_M = as.numeric(RawTime_S)/60
            , RawPace = strptime(Pace, format = "%M:%OS")
            , RawPace_S = RawPace$min * 60 + RawPace$sec 
+           #Normalize Age where 'NR' as NA 
            , Age = ifelse(Age %in% c("NR"), NA, Age)
+           #Cast Variables as appropriate dtypes 
            , Age = as.numeric(Age)
            , RawTime_S = as.numeric(RawTime_S)
            , RawPace_S = as.numeric(RawPace_S)
            , RawPace_M = as.numeric(RawPace_S)/60
+           , year = as.factor(year)
+           #Remove the (<Sex>) from the names
+           , Name = str_replace(Name, " \\s*\\([^\\)]+\\)", '')
            )
+  #Remove columns we do not want 
+  dataDF = dataDF %>% select (-c(cols_to_remove))
                   
   return(dataDF)
 }
@@ -224,10 +239,14 @@ womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/Schoo
 
 
 ```{r}
-mens_table_T = tableTransform(mens_table)
-womens_table_T = tableTransform(womens_table)
+mens_table_T = tableTransform(mens_table, cols_to_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source") )
+womens_table_T = tableTransform(womens_table, cols_to_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source") )
 
 ```
 
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
+
+```{r}
+head(womens_table_T, n = 10) 
+```
