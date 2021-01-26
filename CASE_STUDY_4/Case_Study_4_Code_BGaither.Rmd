@@ -1,0 +1,380 @@
+---
+title: "Case_Study_4_Code"
+author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  github_document:
+    toc: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+    toc_depth: '6'
+always_allow_html: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(hms)
+library(rvest)
+library(lubridate)
+library(foreach)
+library(stringr)
+library(iterators)
+library(progress)
+library(doParallel)
+library(doSNOW)
+library(dplyr)
+library(ggplot2)
+library(hexbin)
+```
+
+```{r}
+years = c(1999:2012)
+division = 'Overall+Women'
+section = '10M' 
+sex = 'W'
+```
+
+#### Functions
+
+#The gen_Link function will generates the link with the query parameters for the searchable database
+
+```{r}
+gen_Link = function(year,division,section,page=1,sex){
+
+  paste0( 'http://www.cballtimeresults.org/performances'
+          ,'?division=',division,'&page=',page,
+          '&section=',section, '&sex=',sex, 
+          '&utf8=%E2%9C%93','&year=',year)
+          #,'?utf8=%E2%9C%93&section=',section
+          #,'&year=',year,'&division=',division,'&page=', page)
+
+}
+
+```
+
+# The gen_Table function will parse through the table of 20 records and 15 observations
+# and parse the table into its own data frame from xml2 read)html function and then use 
+# the pipe operator to use rvest nodes to find the table structure 
+# then the fucntion will insert the metadata for the query parameters of year, division, section, page, source link and sex 
+```{r}
+gen_Table = function(year,division,section,page, sex){
+  
+  
+  #use gen_link function to get link to page 
+  genlink=gen_Link(year,division,section,page=page, sex=sex)
+  
+  #read the page, and grab to 'table' tag
+  single_table = xml2::read_html(genlink) %>% 
+    rvest::html_nodes("table")  %>% 
+    rvest::html_table(fill=TRUE) 
+  
+  #get the table and add metadata for the query parameters
+  table_out = single_table[[1]] %>% 
+    mutate(year=year, divisionTitle=division, section=section, page=page, source=genlink, sex = sex)
+  
+}
+
+```
+
+# This function will use all available cores on machine
+# It will process the years in parrell. 
+```{r}
+# This code has been adapted from 
+# https://github.com/ngupta23/ds7333_qtw/blob/master/case_study_2/submission_Kannan_Moro_Gupta/code/CS2_ETL.Rmd 
+# https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+# https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+# https://cran.r-project.org/web/packages/progress/progress.pdf
+# https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+```
+
+
+```{r}
+scrapeTables  = function(years,division,section, sex,  max_itr = 500){
+  
+  
+library(progress)
+library(doParallel)
+library(doSNOW)  
+  
+    #Initialize Parrellel Process to detect number of cores 
+    #https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+    #https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+  
+    #Generate and register initial clusters based on cores, otherwise, this is a long process 
+    cl = makeCluster(detectCores())
+    doSNOW::registerDoSNOW(cl)
+    
+    #Generate progress bar for the parallel loop based on number of years 
+    #https://cran.r-project.org/web/packages/progress/progress.pdf
+    progBar = progress::progress_bar$new(total = length(years),format='[:bar] :percent :eta')
+    progress = function(n) progBar$tick()
+    
+    #Initialize a parallel loop per each year
+    #Intialize tableRaw as empty to loop to be populated as a table dataframe from gen_Table function
+    tableRaw=NULL
+    
+    #tableRaw will now use for each using years as the iterator to use .combine to rbind
+    #.export will do the gen_Table and gen_Link functions simultanlously and 
+    #options.snow will show the progress bar
+    # the %dopar% will process all the years simultaneously. 
+    #https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+    tableRaw = foreach(y=years
+                      ,.combine=rbind,.export=c('gen_Table','gen_Link')
+                      ,.options.snow = list(progress=progress)) %dopar%
+      {
+        
+        library(foreach)
+        library(dplyr)
+        #intialize isCompleted variable as FALSE for bool conditions to see if loop has been completed
+        isCompleted=FALSE
+        
+        #Initiate loop since most pages are 487, we will only loop for the iterations for max_itr
+        tableRaw=foreach(p=c(1:max_itr),.combine=rbind) %do% 
+          if(!isCompleted) {
+            message('getting year:',y, ' page:',p,appendLF = F)
+            #get the table of the current page
+            table = gen_Table(year=y
+                             ,division=division
+                             ,section=section
+                             ,page=p
+                             ,sex=sex)
+            message(' rows:',nrow(table))
+            isCompleted = nrow(table)==0 #if there is record, we are at the last page, no need to read further
+            return(table)
+          }
+        return(tableRaw)
+      }
+    #Deactivate the cluster of cores
+    stopCluster(cl)
+    #save the raw data to rda format for later processing based on gender
+    saveRDS(tableRaw,file=paste0('CB',sex,'tableRaw.rda'))
+    
+  return(tableRaw)
+}
+  
+ 
+```
+
+
+```{r}
+Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
+```
+
+```{r}
+head(Women_table)
+```
+
+```{r}
+dfWomen = transform(Women_table, Race = as.factor(Race),Age = as.integer(Age), Hometown = as.factor(Hometown), year = as.factor(year) )
+head(dfWomen)
+```
+```{r}
+summary(dfWomen)
+```
+We evaluate how many null values are in Age = 20 null ages
+```{r}
+print(dim(dfWomen[is.na(dfWomen$Age),])[1])
+```
+
+Upon examining the null age records, it doesn't appear to be a data ingestion issue, we'll drop these records
+```{r}
+dfWomen %>% filter(is.na(Age))
+```
+Dropping the 20 records with null ages as it's not going to help our analysis
+```{r}
+dfWomen = dfWomen %>% filter(!is.na(Age))
+```
+
+```{r}
+f = ggplot(dfWomen)
+f + geom_boxplot(mapping = aes(x=year, y=Age)) + theme_classic() + labs(title="Boxplot of Age by Year")
+
+```
+Let's take a look at the one runner with the low age in 2009, it appears to be legitimate
+```{r}
+dfWomen %>% filter(Age < 10)
+```
+
+Next, we need to convert Time into minutes
+```{r}
+#first, separate time into three different columns (h, m, ss)
+df = dfWomen
+df = separate(df, Time, c("Hours","Minutes","Seconds"),":", remove=FALSE, convert=TRUE, fill="warn")
+
+#next, we calculate the number of minutes into a new colume called TimeMinutes
+df$TimeMinutes = (df$Hours * 60) + df$Minutes + (df$Seconds/60)
+head(df)
+```
+
+Saving the dataframe for later retrieval
+```{r}
+#write.csv(df,"C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", row.names = FALSE)
+```
+
+load the data if necessary
+```{r}
+file_path = "C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv"
+df = read.csv(file_path, header=TRUE)
+```
+
+
+```{r}
+ggplot(df, aes(x = Age, y=TimeMinutes)) + 
+  geom_hex() +
+  theme_bw() + 
+  labs(title="Scatter Plot of Female Runners:  Age vs Time in Minutes")
+
+```
+
+```{r}
+df$AgeBin = cut(df$Age, breaks=c(0,5,15,25,35,45,55,65,75,85,95),labels=c("1-5","6-15","16-25","26-35","36-45","46-55","56-65","66-75","76-85","86-95"))
+head(df)
+```
+
+Let's take a look at age groups and their relationship to running time
+```{r}
+f = ggplot(df)
+f + geom_boxplot(mapping = aes(x=AgeBin, y=TimeMinutes)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
+```
+let's create a new column to hold the pace per mile
+```{r}
+df$PaceMinutes = (df$TimeMinutes/10)
+df$PaceBin = cut(df$PaceMinutes, breaks=c(0,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,18), 
+                 labels=c("1-5","5.1-5.5","5.5-6","6-6.5","6.5-7","7-7.5","7.5-8","8-8.5","8.5-9","9-9.5","9.5-10","10-10.5","10.5-11","11-18"))
+```
+
+
+```{r}
+library(plyr)
+
+mu <- ddply(df, "year", summarise, grp.mean=mean(Age))
+
+p<-ggplot(df, aes(x=Age)) +
+  geom_density() +
+  facet_grid(vars(year) , scale="free_y") +
+  labs(title="Distribution of Age throughout the years")
+p
+# Add mean lines
+p+geom_vline(data=mu, aes(xintercept=grp.mean, color="red"),
+             linetype="dashed")
+
+
+```
+Let's look at the volume of runners by pace bin
+```{r}
+
+ggplot(df %>% group_by(year, PaceBin) %>% tally()) +
+  geom_col(mapping = aes(x=PaceBin, y=n)) +
+  facet_grid(vars(year)) +
+  labs(title="Distribution of pace throughout the years")
+  
+```
+Let's examine the volume of runners by year by age group to see if there has been an increase in the number of younger runners
+```{r}
+ggplot(df %>% group_by(year, AgeBin) %>% tally()) +
+  geom_col(mapping = aes(x=AgeBin, y=n)) +
+  facet_wrap(vars(year)) +
+  labs(title="Distribution of Age throughout the years") 
+
+
+
+```
+
+
+
+
+Let's get a sense of the distribution of age over the years
+```{r}
+f = ggplot(df %>% group_by(year, AgeBin) %>% tally())
+f + geom_col(mapping = aes(x=AgeBin, y=n)) + facet_wrap(vars(year)) + theme_classic() + labs(title="Boxplot of Age Group by Year")
+```
+
+
+```{r}
+ggplot(df %>% group_by(year) %>% tally()) +
+  geom_col(mapping = aes(x=year, y=n)) +
+  labs(title="Volume of runners by year")
+```
+
+
+```{r}
+dfRunVol = df %>% group_by(year) %>% tally()
+dfRunVol$year = as.integer(dfRunVol$year)
+names(dfRunVol)[2] <- "RunnerVolume"
+head(dfRunVol)
+```
+
+```{r}
+
+
+lmRunVol = lm(RunnerVolume ~ year, data = dfRunVol)
+lmRunVol$coefficients
+
+```
+
+
+```{r}
+summary(lmRunVol)
+```
+
+
+```{r}
+summary(df$PaceMinutes)
+```
+
+
+```{r}
+ggplot(df) +
+  geom_boxplot(mapping = aes(x=AgeBin))
+```
+
+
+Let's fit a linear regression model looking at running time as a function of age.  The lm function performs least squares to find the best fitting line to our data
+```{r}
+lmAge = lm(TimeMinutes ~ Age, data = df)
+lmAge$coefficients
+```
+
+```{r}
+summary(lmAge)
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
