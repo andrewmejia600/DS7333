@@ -32,6 +32,8 @@ library(doParallel)
 library(doSNOW)
 library(dplyr)
 library(states)
+library(ggplot2)
+library(ggthemes)
 ```
 
 ```{r}
@@ -85,14 +87,12 @@ gen_Table = function(year,division,section,page, sex){
 
 # This function will use all available cores on machine
 # It will process the years in parrell. 
-```{r}
 # This code has been adapted from 
 # https://github.com/ngupta23/ds7333_qtw/blob/master/case_study_2/submission_Kannan_Moro_Gupta/code/CS2_ETL.Rmd 
 # https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
 # https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
 # https://cran.r-project.org/web/packages/progress/progress.pdf
 # https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
-```
 
 
 ```{r}
@@ -168,7 +168,7 @@ library(doSNOW)
 ### https://stackoverflow.com/questions/24173194/remove-parentheses-and-text-within-from-strings-in-r  ###
 
 ```{r}
-tableTransform =function(data_df, cols_to_remove){
+tableTransform =function(data_df, cols_to_remove=NULL){
   dataDF = data_df %>% 
     #Seperate Home town into seperate columns
     separate(col = 'Hometown', c('HomeTown', 'HomeState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
@@ -209,9 +209,9 @@ tableTransform =function(data_df, cols_to_remove){
            , Name = str_replace(Name, " \\s*\\([^\\)]+\\)", '')
            )
   #Remove columns we do not want 
-  dataDF = dataDF %>% select (-c(cols_to_remove))
+  dataDF = dataDF %>% select (-all_of(c(cols_to_remove)))
                   
-  return(dataDF)
+  return(dataDF %>% select(c(Name, Age, year,  HomeTown, HomeState, HomeCountry, RawTime_S, RawTime_M, RawPace_S, RawPace_M, sex, section, PiS, TiS, PiD, TiD)))
 }
 ```
 
@@ -221,11 +221,11 @@ tableTransform =function(data_df, cols_to_remove){
 
 ### Caution takes a long time without hexacore machine ### 
 ```{r}
-Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
+#Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
 ```
 
 ```{r}
-men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
+#men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
 
 ```
 
@@ -239,14 +239,67 @@ womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/Schoo
 
 
 ```{r}
-mens_table_T = tableTransform(mens_table, cols_to_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source") )
-womens_table_T = tableTransform(womens_table, cols_to_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source") )
+cols_for_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source")
+mens_table_T = tableTransform(mens_table, cols_to_remove = all_of(cols_for_remove))
+womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_remove))
 
 ```
+```{r}
+head(womens_table_T, n = 10)
+```
 
-####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+```{r}
+summary(womens_table_T)
+```
+
+```{r}
+columns = c("Name", "Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
+
+womens_table_T_na = womens_table_T %>% filter_at(vars(all_of(columns)),any_vars(is.na(.)))
+
+womens_table_T_na
+```
+
+```{r}
+na_df = data.frame(rowsum(+(is.na(womens_table_T)), womens_table_T$year))
+na_df = cbind(year_idx = rownames(na_df), na_df)
+```
 
 
 ```{r}
-head(womens_table_T, n = 10) 
+p1_na = ggplot(na_df, aes(x=year_idx, y=HomeTown)) + geom_bar(stat = "identity", fill = "grey") + labs(title = "Counts of missing HomeTown Records by Year") + xlab("Year Index") + ylab("Count of HomeTown")
+p1_na
+```
+
+```{r}
+p2_na = ggplot(na_df, aes(x=year_idx, y=HomeState)) + geom_bar(stat = "identity", fill = "grey") +  labs(title = "Counts of missing HomeState Records by Year") + xlab("Year Index") + ylab("Count of HomeState")
+
+p2_na
+```
+
+## We will remove NAs and only focus on completed records and rewmove NAs for further processing 
+```{r}
+womens_table_T = womens_table_T[complete.cases(womens_table_T), ]
+```
+
+
+#############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+
+```{r}
+plot_data_age = ggplot(womens_table_T, aes(x = year, y = Age)) + geom_boxplot() + labs(title = "Distribution of Women Participants Age by Year") + xlab("Year") + ylab("Age")
+
+plot_data_age
+```
+
+```{r}
+plot_data_time = ggplot(womens_table_T, aes(x = year, y = RawTime_M)) + geom_boxplot() + labs(title = "Distribution of Women Raw Time by Year") + xlab("Year") + ylab("Minutes")
+
+plot_data_time
+```
+
+```{r}
+plot_data_Pace = ggplot(womens_table_T, aes(x = year, y = RawPace_M)) + geom_boxplot() + labs(title = "Distribution of Women Raw Pace by Year") + xlab("Year") + ylab("Minutes")
+
+
+plot_data_Pace
 ```
