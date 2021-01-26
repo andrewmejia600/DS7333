@@ -206,12 +206,12 @@ tableTransform =function(data_df, cols_to_remove=NULL){
            , RawPace_M = as.numeric(RawPace_S)/60
            , year = as.factor(year)
            #Remove the (<Sex>) from the names
-           , Name = str_replace(Name, " \\s*\\([^\\)]+\\)", '')
+           #, Name = str_replace(Name, " \\s*\\([^\\)]+\\)", '')
            )
   #Remove columns we do not want 
   dataDF = dataDF %>% select (-all_of(c(cols_to_remove)))
                   
-  return(dataDF %>% select(c(Name, Age, year,  HomeTown, HomeState, HomeCountry, RawTime_S, RawTime_M, RawPace_S, RawPace_M, sex, section, PiS, TiS, PiD, TiD)))
+  return(dataDF %>% select(c( Age, year,  HomeTown, HomeState, HomeCountry, RawTime_S, RawTime_M, RawPace_S, RawPace_M, sex, section, PiS, TiS, PiD, TiD)))
 }
 ```
 
@@ -237,6 +237,9 @@ mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/
 womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
 ```
 
+```{r}
+view(head(womens_table, n = 10))
+```
 
 ```{r}
 cols_for_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source")
@@ -244,6 +247,7 @@ mens_table_T = tableTransform(mens_table, cols_to_remove = all_of(cols_for_remov
 womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_remove))
 
 ```
+
 ```{r}
 head(womens_table_T, n = 10)
 ```
@@ -253,7 +257,7 @@ summary(womens_table_T)
 ```
 
 ```{r}
-columns = c("Name", "Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
+columns = c("Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
 
 womens_table_T_na = womens_table_T %>% filter_at(vars(all_of(columns)),any_vars(is.na(.)))
 
@@ -277,11 +281,19 @@ p2_na = ggplot(na_df, aes(x=year_idx, y=HomeState)) + geom_bar(stat = "identity"
 p2_na
 ```
 
-## We will remove NAs and only focus on completed records and rewmove NAs for further processing 
+## We will remove NAs and only focus on completed records and rewmove NAs for further processing and reindex the table. 
 ```{r}
 womens_table_T = womens_table_T[complete.cases(womens_table_T), ]
+row.names(womens_table_T) = NULL 
 ```
 
+```{r}
+head(womens_table_T, n = 10)
+```
+```{r}
+womensTableInfo = data.frame(Variable = names(womens_table_T),Type = sapply(womens_table_T, typeof), row.names = NULL)
+womensTableInfo
+```
 
 #############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
