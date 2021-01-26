@@ -19,7 +19,6 @@ always_allow_html: yes
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
 ```{r}
 library(tidyverse)
 library(hms)
@@ -32,8 +31,7 @@ library(progress)
 library(doParallel)
 library(doSNOW)
 library(dplyr)
-library(ggplot2)
-library(hexbin)
+library(states)
 ```
 
 ```{r}
@@ -156,7 +154,7 @@ library(doSNOW)
     #Deactivate the cluster of cores
     stopCluster(cl)
     #save the raw data to rda format for later processing based on gender
-    saveRDS(tableRaw,file=paste0('CB',sex,'tableRaw.rda'))
+    saveRDS(tableRaw,file=paste0('CB',sex,'tableRaw.rds'))
     
   return(tableRaw)
 }
@@ -164,193 +162,72 @@ library(doSNOW)
  
 ```
 
+### The purpose of this function is to transform the raw tables from the scrape ###
+### https://stackoverflow.com/questions/50040968/convert-a-duration-hms-to-seconds ### 
+### https://stackoverflow.com/questions/10835908/is-there-a-way-to-convert-mmss-00-to-seconds-00 ### 
 
+```{r}
+tableTransform =function(data_df){
+  dataDF = data_df %>% 
+    separate(col = 'Hometown', c('HTown', 'HState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    mutate(HTown = toupper(trimws(HTown))
+           , HState = toupper(trimws(HState))
+           , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
+           , HState = ifelse(HState %in% c('NR', ''), NA, HState)
+           , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
+           , PiS = ifelse(trimws(PiS) %in% c('NR', ''), NA, trimws(PiS))
+           , TiS = ifelse(trimws(TiS) %in% c('NR', ''), NA, trimws(TiS))
+           , PiD = ifelse(trimws(PiD) %in% c('NR', ''), NA, trimws(PiD))
+           , TiD = ifelse(trimws(TiD) %in% c('NR', ''), NA, trimws(PiD))
+           , Division = ifelse(trimws(Division) %in% c('NR', ''), NA, trimws(Division))
+           , RawTime = strptime(Time, format='%H:%M:%S')
+           , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
+           , RawTime_M = as.numeric(RawTime_S)/60
+           , RawPace = strptime(Pace, format = "%M:%OS")
+           , RawPace_S = RawPace$min * 60 + RawPace$sec 
+           , Age = ifelse(Age %in% c("NR"), NA, Age)
+           , Age = as.numeric(Age)
+           , RawTime_S = as.numeric(RawTime_S)
+           , RawPace_S = as.numeric(RawPace_S)
+           , RawPace_M = as.numeric(RawPace_S)/60
+           )
+                  
+  return(dataDF)
+}
+```
+
+
+
+### Perform Scrape ### 
+
+### Caution takes a long time without hexacore machine ### 
 ```{r}
 Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
 ```
 
 ```{r}
-head(Women_table)
-```
-
-```{r}
-dfWomen = transform(Women_table, Race = as.factor(Race),Age = as.integer(Age), Hometown = as.factor(Hometown), year = as.factor(year) )
-head(dfWomen)
-```
-```{r}
-summary(dfWomen)
-```
-We evaluate how many null values are in Age = 20 null ages
-```{r}
-print(dim(dfWomen[is.na(dfWomen$Age),])[1])
-```
-
-Upon examining the null age records, it doesn't appear to be a data ingestion issue, we'll drop these records
-```{r}
-dfWomen %>% filter(is.na(Age))
-```
-Dropping the 20 records with null ages as it's not going to help our analysis
-```{r}
-dfWomen = dfWomen %>% filter(!is.na(Age))
-```
-
-```{r}
-f = ggplot(dfWomen)
-f + geom_boxplot(mapping = aes(x=year, y=Age)) + theme_classic() + labs(title="Boxplot of Age by Year")
+men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
 
 ```
-Let's take a look at the one runner with the low age in 2009, it appears to be legitimate
-```{r}
-dfWomen %>% filter(Age < 10)
-```
 
-Next, we need to convert Time into minutes
-```{r}
-#first, separate time into three different columns (h, m, ss)
-df = dfWomen
-df = separate(df, Time, c("Hours","Minutes","Seconds"),":", remove=FALSE, convert=TRUE, fill="warn")
+### Load tables from file ### 
 
-#next, we calculate the number of minutes into a new colume called TimeMinutes
-df$TimeMinutes = (df$Hours * 60) + df$Minutes + (df$Seconds/60)
-head(df)
-```
-
-Saving the dataframe for later retrieval
 ```{r}
-#write.csv(df,"C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", row.names = FALSE)
-```
+mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBMtableRaw.rds")
 
-load the data if necessary
-```{r}
-file_path = "C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv"
-df = read.csv(file_path, header=TRUE)
+womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
 ```
 
 
 ```{r}
-ggplot(df, aes(x = Age, y=TimeMinutes)) + 
-  geom_hex() +
-  theme_bw() + 
-  labs(title="Scatter Plot of Female Runners:  Age vs Time in Minutes")
+mens_table_T = tableTransform(mens_table)
+womens_table_T = tableTransform(womens_table)
 
 ```
 
-```{r}
-df$AgeBin = cut(df$Age, breaks=c(0,5,15,25,35,45,55,65,75,85,95),labels=c("1-5","6-15","16-25","26-35","36-45","46-55","56-65","66-75","76-85","86-95"))
-head(df)
-```
-
-Let's take a look at age groups and their relationship to running time
-```{r}
-f = ggplot(df)
-f + geom_boxplot(mapping = aes(x=AgeBin, y=TimeMinutes)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
-```
-let's create a new column to hold the pace per mile
-```{r}
-df$PaceMinutes = (df$TimeMinutes/10)
-df$PaceBin = cut(df$PaceMinutes, breaks=c(0,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,18), 
-                 labels=c("1-5","5.1-5.5","5.5-6","6-6.5","6.5-7","7-7.5","7.5-8","8-8.5","8.5-9","9-9.5","9.5-10","10-10.5","10.5-11","11-18"))
-```
-
-
-```{r}
-library(plyr)
-
-mu <- ddply(df, "year", summarise, grp.mean=mean(Age))
-
-p<-ggplot(df, aes(x=Age)) +
-  geom_density() +
-  facet_grid(vars(year) , scale="free_y") +
-  labs(title="Distribution of Age throughout the years")
-p
-# Add mean lines
-p+geom_vline(data=mu, aes(xintercept=grp.mean, color="red"),
-             linetype="dashed")
-
-
-```
-
-```{r}
-
-ggplot(df %>% group_by(year, PaceBin) %>% tally()) +
-  geom_col(mapping = aes(x=PaceBin, y=n)) +
-  facet_grid(vars(year))
-  
-```
-```{r}
-ggplot(df %>% group_by(year) %>% tally()) +
-  geom_col(mapping = aes(x=year, y=n)) +
-  labs(title="Volume of runners by year")
-```
-```{r}
-dfRunVol = df %>% group_by(year) %>% tally()
-dfRunVol$year = as.integer(dfRunVol$year)
-names(dfRunVol)[2] <- "RunnerVolume"
-head(dfRunVol)
-```
-
-```{r}
-
-
-lmRunVol = lm(RunnerVolume ~ year, data = dfRunVol)
-lmRunVol$coefficients
-
-```
-
-
-```{r}
-summary(lmRunVol)
-```
-
-
-```{r}
-summary(df$PaceMinutes)
-```
-
-
-```{r}
-ggplot(df) +
-  geom_boxplot(mapping = aes(x=AgeBin))
-```
-
-
-Let's fit a linear regression model looking at running time as a function of age.  The lm function performs least squares to find the best fitting line to our data
-```{r}
-lmAge = lm(TimeMinutes ~ Age, data = df)
-lmAge$coefficients
-```
-
-```{r}
-summary(lmAge)
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
+####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
