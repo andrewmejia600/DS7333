@@ -186,9 +186,6 @@ ggplotly(p, tooltip="text")
 ```
 
 ```{r}
-#predict LM
-
-
 #Predict LOESS on time
 plot(Time~year, ylim = c(94,100), data=CBWtableRaw, main="Year V Time")
 out <- loess(Time~year, data=CBWtableRaw)
@@ -196,7 +193,19 @@ curve(predict(out, newdata=data.frame(year = x)), add=TRUE)
 ```
 
 Run a piecewise fit next
+```{r}
+plotdata = CBWtableRaw %>% 
+ group_by(year)   %>% 
+  summarise(average = mean(Time), .groups = "keep")
 
+plotdata$average = as.integer(plotdata$average)
+plotdata$average = as.ts(plotdata$average)
+
+library(changepoint)
+dis.bs <- cpt.meanvar(plotdata$average, test.stat = "Poisson", method = "BinSeg")
+cpts.ts(dis.bs)
+plot(dis.bs, cpt.width = 3)
+```
 
 evaluate city/state impact for recommendations for planning
 ```{r}
