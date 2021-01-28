@@ -238,7 +238,7 @@ womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/Schoo
 ```
 
 ```{r}
-view(head(womens_table, n = 10))
+head(womens_table, n = 10)
 ```
 
 ```{r}
@@ -250,6 +250,7 @@ womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_r
 
 ```{r}
 head(womens_table_T, n = 10)
+dim(womens_table_T)
 ```
 
 ```{r}
@@ -261,7 +262,8 @@ columns = c("Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S",
 
 womens_table_T_na = womens_table_T %>% filter_at(vars(all_of(columns)),any_vars(is.na(.)))
 
-womens_table_T_na
+head(womens_table_T_na, n = 10) 
+dim(womens_table_T_na)
 ```
 
 ```{r}
@@ -291,7 +293,8 @@ row.names(womens_table_T) = NULL
 head(womens_table_T, n = 10)
 ```
 ```{r}
-womensTableInfo = data.frame(Variable = names(womens_table_T),Type = sapply(womens_table_T, typeof), row.names = NULL)
+Descriptions = c('Participant Age', 'Year of race', 'Participant Home Town', 'Participant Home State', 'Participant Home Country', "Participant's Time in Seconds", "Participant's Time in Minutes", "Participants Mile Pace in Seconds", "Participants Mile Pace in Minutes", "Gender", "Participant Race", "Position in Sex", "Total in Sex", "Position in Division", "Total in Division")
+womensTableInfo = data.frame(Feature = names(womens_table_T), Description = Descriptions , Type = sapply(womens_table_T, typeof), row.names = NULL)
 womensTableInfo
 ```
 
