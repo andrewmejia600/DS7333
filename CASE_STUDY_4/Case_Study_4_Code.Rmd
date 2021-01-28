@@ -352,11 +352,11 @@ ggplot(womens_table_T %>% group_by(year, PaceBin) %>% tally()) +
   labs(title="Distribution of pace throughout the years")
 
 ```
-Let's take a look at the median pace per year
+Let's take a look at the median pace per year.
 ```{r}
 womens_table_T %>% group_by(year) %>% dplyr::summarise(median_pace = median(RawPace_M)) %>% ggplot(aes(x=year, y=median_pace)) + geom_point() + ggtitle("Median Pace Per Year")
 ```
-
+If we look at the max times throughout the years, there isn't a consistent pattern observable, we'll revisit this after looking more at the age bins further
 ```{r}
 womens_table_T %>% group_by(year) %>% dplyr::summarise(max_time = max( RawTime_M )) %>% ggplot(aes(x=year, y=max_time)) + geom_point()
 ```
@@ -369,6 +369,58 @@ ggplot(womens_table_T %>% group_by(year, AgeBin) %>% tally()) +
   labs(title="Distribution of age throughout the years")
 
 ```
+Let's take a closer look at the volume of runners in the 26-35 age category
+```{r}
+dfRunAgeBinVol = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(AgeBinVolume = n()) 
+head(dfRunAgeBinVol)
+ggplot(dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]) +
+  geom_point(mapping = aes(x=year, y=AgeBinVolume)) +
+  #facet_wrap(vars(year)) +
+  labs(title="Distribution of Age throughout the years")
+```
+
+```{r}
+dfRunAgeBinVol$year = as.numeric(as.character(dfRunAgeBinVol$year))
+dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+```
+
+```{r}
+df26 = dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+loessAge26 = loess(AgeBinVolume ~year, data=df26)
+preds = predict(loessAge26)
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(df26, mapping = aes(x=year, y=preds, col = "red")) + 
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category")
+```
+
+```{r}
+
+pw.model = piecewise.linear(df26$year, df26$AgeBinVolume, middle=1, CI=TRUE, sig.level = 0.05)
+pw.model
+```
+Now that we have a piecewise linear model, let's predict the volume of 26-35 year olds in years 2013 and 2014
+```{r}
+preds = predict(pw.model,c(1999:2014))
+predYears = c(1999:2014)
+dfPreds = data.frame(year = predYears, predAgeBinVolume = predict(pw.model,predYears))
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(dfPreds, mapping = aes(x=year, y=predAgeBinVolume, col = "red")) + 
+  geom_point(dfPreds[dfPreds$year %in% c(2013:2014), ], mapping = aes(x=year, y=predAgeBinVolume, col = "blue")) +
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category in years 2013 and 2014")
+```
+The actual predicted values for years 2013 and 2014
+```{r}
+predict(pw.model,c(2013:2014))
+```
+Let's look at average times of age 25-36 year olds
+```{r}
+dfAvgTimes26 = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(avgTime = mean(RawTime_M))
+dfAvgTimes26 = dfAvgTimes26[dfAvgTimes26$AgeBin == '26-35',]
+dfAvgTimes26 %>% ggplot(aes(x=year, y=avgTime/60)) + geom_point() + ggtitle("Average Race Time Per Year for 26-35 Age Category") + labs(y="Race Time (hr)")
+```
+
 
 ```{r}
 
@@ -389,7 +441,5 @@ ggplot(womens_table_T %>% group_by(year, AgeBin) %>% tally()) +
 ```{r}
 
 ```
-
-
 
 
