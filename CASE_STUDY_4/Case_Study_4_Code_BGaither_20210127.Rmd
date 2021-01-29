@@ -1,0 +1,445 @@
+---
+title: "Case_Study_4_Code"
+author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  github_document:
+    toc: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+    toc_depth: '6'
+always_allow_html: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(hms)
+library(rvest)
+library(lubridate)
+library(foreach)
+library(stringr)
+library(iterators)
+library(progress)
+library(doParallel)
+library(doSNOW)
+library(dplyr)
+library(states)
+library(SiZer)
+library(ggplot2)
+library(caret)
+```
+
+```{r}
+years = c(1999:2012)
+division = 'Overall+Women'
+section = '10M' 
+sex = 'W'
+```
+
+#### Functions
+
+#The gen_Link function will generates the link with the query parameters for the searchable database
+
+```{r}
+gen_Link = function(year,division,section,page=1,sex){
+
+  paste0( 'http://www.cballtimeresults.org/performances'
+          ,'?division=',division,'&page=',page,
+          '&section=',section, '&sex=',sex, 
+          '&utf8=%E2%9C%93','&year=',year)
+          #,'?utf8=%E2%9C%93&section=',section
+          #,'&year=',year,'&division=',division,'&page=', page)
+
+}
+
+```
+
+# The gen_Table function will parse through the table of 20 records and 15 observations
+# and parse the table into its own data frame from xml2 read)html function and then use 
+# the pipe operator to use rvest nodes to find the table structure 
+# then the fucntion will insert the metadata for the query parameters of year, division, section, page, source link and sex 
+```{r}
+gen_Table = function(year,division,section,page, sex){
+  
+  
+  #use gen_link function to get link to page 
+  genlink=gen_Link(year,division,section,page=page, sex=sex)
+  
+  #read the page, and grab to 'table' tag
+  single_table = xml2::read_html(genlink) %>% 
+    rvest::html_nodes("table")  %>% 
+    rvest::html_table(fill=TRUE) 
+  
+  #get the table and add metadata for the query parameters
+  table_out = single_table[[1]] %>% 
+    mutate(year=year, divisionTitle=division, section=section, page=page, source=genlink, sex = sex)
+  
+}
+
+```
+
+# This function will use all available cores on machine
+# It will process the years in parrell. 
+```{r}
+# This code has been adapted from 
+# https://github.com/ngupta23/ds7333_qtw/blob/master/case_study_2/submission_Kannan_Moro_Gupta/code/CS2_ETL.Rmd 
+# https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+# https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+# https://cran.r-project.org/web/packages/progress/progress.pdf
+# https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+```
+
+
+```{r}
+scrapeTables  = function(years,division,section, sex,  max_itr = 500){
+  
+  
+library(progress)
+library(doParallel)
+library(doSNOW)  
+  
+    #Initialize Parrellel Process to detect number of cores 
+    #https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+    #https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+  
+    #Generate and register initial clusters based on cores, otherwise, this is a long process 
+    cl = makeCluster(detectCores())
+    doSNOW::registerDoSNOW(cl)
+    
+    #Generate progress bar for the parallel loop based on number of years 
+    #https://cran.r-project.org/web/packages/progress/progress.pdf
+    progBar = progress::progress_bar$new(total = length(years),format='[:bar] :percent :eta')
+    progress = function(n) progBar$tick()
+    
+    #Initialize a parallel loop per each year
+    #Intialize tableRaw as empty to loop to be populated as a table dataframe from gen_Table function
+    tableRaw=NULL
+    
+    #tableRaw will now use for each using years as the iterator to use .combine to rbind
+    #.export will do the gen_Table and gen_Link functions simultanlously and 
+    #options.snow will show the progress bar
+    # the %dopar% will process all the years simultaneously. 
+    #https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+    tableRaw = foreach(y=years
+                      ,.combine=rbind,.export=c('gen_Table','gen_Link')
+                      ,.options.snow = list(progress=progress)) %dopar%
+      {
+        
+        library(foreach)
+        library(dplyr)
+        #intialize isCompleted variable as FALSE for bool conditions to see if loop has been completed
+        isCompleted=FALSE
+        
+        #Initiate loop since most pages are 487, we will only loop for the iterations for max_itr
+        tableRaw=foreach(p=c(1:max_itr),.combine=rbind) %do% 
+          if(!isCompleted) {
+            message('getting year:',y, ' page:',p,appendLF = F)
+            #get the table of the current page
+            table = gen_Table(year=y
+                             ,division=division
+                             ,section=section
+                             ,page=p
+                             ,sex=sex)
+            message(' rows:',nrow(table))
+            isCompleted = nrow(table)==0 #if there is record, we are at the last page, no need to read further
+            return(table)
+          }
+        return(tableRaw)
+      }
+    #Deactivate the cluster of cores
+    stopCluster(cl)
+    #save the raw data to rda format for later processing based on gender
+    saveRDS(tableRaw,file=paste0('CB',sex,'tableRaw.rds'))
+    
+  return(tableRaw)
+}
+  
+ 
+```
+
+### The purpose of this function is to transform the raw tables from the scrape ###
+### https://stackoverflow.com/questions/50040968/convert-a-duration-hms-to-seconds ### 
+### https://stackoverflow.com/questions/10835908/is-there-a-way-to-convert-mmss-00-to-seconds-00 ### 
+
+```{r}
+tableTransform =function(data_df){
+  dataDF = data_df %>% 
+    separate(col = 'Hometown', c('HTown', 'HState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    mutate(HTown = toupper(trimws(HTown))
+           , HState = toupper(trimws(HState))
+           , HTown = ifelse(HTown %in% c('NR', ''), NA, HTown)
+           , HState = ifelse(HState %in% c('NR', ''), NA, HState)
+           , HCountry = ifelse(HState %in% c(state.abb, "DC"), "USA", HTown)
+           , PiS = ifelse(trimws(PiS) %in% c('NR', ''), NA, trimws(PiS))
+           , TiS = ifelse(trimws(TiS) %in% c('NR', ''), NA, trimws(TiS))
+           , PiD = ifelse(trimws(PiD) %in% c('NR', ''), NA, trimws(PiD))
+           , TiD = ifelse(trimws(TiD) %in% c('NR', ''), NA, trimws(PiD))
+           , Division = ifelse(trimws(Division) %in% c('NR', ''), NA, trimws(Division))
+           , RawTime = strptime(Time, format='%H:%M:%S')
+           , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
+           , RawTime_M = as.numeric(RawTime_S)/60
+           , RawPace = strptime(Pace, format = "%M:%OS")
+           , RawPace_S = RawPace$min * 60 + RawPace$sec 
+           , Age = ifelse(Age %in% c("NR"), NA, Age)
+           , Age = as.numeric(Age)
+           , RawTime_S = as.numeric(RawTime_S)
+           , RawPace_S = as.numeric(RawPace_S)
+           , RawPace_M = as.numeric(RawPace_S)/60
+           )
+                  
+  return(dataDF)
+}
+```
+
+
+
+### Perform Scrape ### 
+
+### Caution takes a long time without hexacore machine ### 
+```{r}
+Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
+```
+
+```{r}
+men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
+
+```
+
+### Load tables from file ### 
+
+```{r}
+mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBMtableRaw.rds")
+
+womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
+```
+```{r}
+class(Women_table)
+```
+
+```{r}
+#mens_table_T = tableTransform(mens_table)
+womens_table_T = tableTransform(Women_table)
+
+```
+
+####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+
+```{r}
+head(womens_table_T)
+```
+
+```{r}
+dim(womens_table_T)
+```
+
+We see that there are relatively few instances of NAs in the dataframe
+```{r}
+colSums(is.na(womens_table_T))
+```
+
+
+Let's drop the NAs as the will not help our analysis
+```{r}
+womens_table_T = womens_table_T[rowSums(is.na(womens_table_T))==0,]
+```
+
+we dropped approximately 260 rows of data to leave only rows that contain values across all columns
+```{r}
+dim(womens_table_T)
+```
+Let's convert some of the data types to make the data easier to work with later
+```{r}
+womens_table_T = transform(womens_table_T, Race = as.factor(Race),Age = as.integer(Age), HTown = as.factor(HTown), HState = as.factor(HState), HCountry = as.factor(HCountry), year = as.factor(year) )
+```
+
+Creating an age bin column for analysis
+```{r}
+womens_table_T$AgeBin = cut(womens_table_T$Age, breaks=c(0,5,15,25,35,45,55,65,75,85,95),labels=c("1-5","6-15","16-25","26-35","36-45","46-55","56-65","66-75","76-85","86-95"))
+```
+
+Creating a column to bin the pace in minutes for later analysis
+```{r}
+womens_table_T$PaceBin = cut(womens_table_T$RawPace_M, breaks=c(0,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,14,18), 
+                 labels=c("1-5","5.1-5.5","5.5-6","6-6.5","6.5-7","7-7.5","7.5-8","8-8.5","8.5-9","9-9.5","9.5-10","10-10.5","10.5-11","11-11.5","11.5-12","12-12.5","12.5-13","13-13.5","13.5-14","11-18"))
+
+```
+
+write out the dataframe for later retrieval
+```{r}
+#write.csv(womens_table_T,"C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", row.names = FALSE)
+```
+
+```{r}
+ggplot(womens_table_T, aes(x = Age, y=RawTime_M)) + 
+  geom_hex() +
+  theme_bw() + 
+  labs(title="Scatter Plot of Female Runners:  Age vs Time in Minutes")
+
+```
+```{r}
+f = ggplot(womens_table_T)
+f + geom_boxplot(mapping = aes(x=AgeBin, y=RawTime_M)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
+```
+Let's examine overall runner volume
+```{r}
+dfRunVol = womens_table_T %>% group_by(year) %>% tally()
+dfRunVol$year = as.integer(dfRunVol$year)
+names(dfRunVol)[2] <- "RunnerVolume"
+head(dfRunVol)
+```
+
+Plotting out volume of runners by year
+```{r}
+ggplot(dfRunVol, aes(x=year, y=RunnerVolume)) +
+  geom_col() +
+  labs(title="Volume of runners by year") +
+geom_text(aes(label = RunnerVolume), vjust = -0.5)
+```
+let's see how well we can predict the volume of racers in the 15th year
+```{r}
+
+
+lmRunVol = lm(RunnerVolume ~ year, data = dfRunVol)
+lmRunVol$coefficients
+
+```
+Below we see we have a statistically significant slope and intercept
+```{r}
+summary(lmRunVol)
+```
+See how well our line fits
+```{r}
+preds = predict(lmRunVol)
+ggplot(dfRunVol, aes(x=year, y=RunnerVolume)) + geom_point() + geom_line(dfRunVol, mapping = aes(x=year, y=preds, col = "red")) + ggtitle("Prediction of Runner Volume")
+```
+How many runners are predicted to attend in 2013 (year 15)
+```{r}
+y_hat = 800.5 + (15*613.4)
+
+print(paste0("Predicted volume of runners in 2013 is: ", y_hat))
+```
+95% confidence intervals
+```{r}
+dfNew = data.frame(year=15)
+predict(lmRunVol, newdata = dfNew, interval = 'confidence')
+```
+
+
+
+we can see below that the IQR of running times throughout the years has remained relatively constant
+```{r}
+f = ggplot(womens_table_T)
+f + geom_boxplot(mapping = aes(x=year, y=RawTime_M)) + theme_classic() + labs(title="Boxplot of Running Time (Minutes) by Year")
+```
+Let's look at the volume of runners by pace bin.  We can see that the majority of runners are between 8-11 minute pace.  This means that a large swell of runners will be running through the course together and race support must have enough volunteers to support the increase of runners as they make their way through the course.
+```{r}
+
+ggplot(womens_table_T %>% group_by(year, PaceBin) %>% tally()) +
+  geom_col(mapping = aes(x=PaceBin, y=n)) +
+  facet_grid(vars(year)) +
+  labs(title="Distribution of pace throughout the years")
+
+```
+Let's take a look at the median pace per year.
+```{r}
+womens_table_T %>% group_by(year) %>% dplyr::summarise(median_pace = median(RawPace_M)) %>% ggplot(aes(x=year, y=median_pace)) + geom_point() + ggtitle("Median Pace Per Year")
+```
+If we look at the max times throughout the years, there isn't a consistent pattern observable, we'll revisit this after looking more at the age bins further
+```{r}
+womens_table_T %>% group_by(year) %>% dplyr::summarise(max_time = max( RawTime_M )) %>% ggplot(aes(x=year, y=max_time)) + geom_point()
+```
+
+we see below that there has been a steady increase in 26-35 year old runners over the years
+```{r}
+ggplot(womens_table_T %>% group_by(year, AgeBin) %>% tally()) +
+  geom_col(mapping = aes(x=AgeBin, y=n)) +
+  facet_grid(vars(year)) +
+  labs(title="Distribution of age throughout the years")
+
+```
+Let's take a closer look at the volume of runners in the 26-35 age category
+```{r}
+dfRunAgeBinVol = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(AgeBinVolume = n()) 
+head(dfRunAgeBinVol)
+ggplot(dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]) +
+  geom_point(mapping = aes(x=year, y=AgeBinVolume)) +
+  #facet_wrap(vars(year)) +
+  labs(title="Distribution of Age throughout the years")
+```
+
+```{r}
+dfRunAgeBinVol$year = as.numeric(as.character(dfRunAgeBinVol$year))
+dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+```
+
+```{r}
+df26 = dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+loessAge26 = loess(AgeBinVolume ~year, data=df26)
+preds = predict(loessAge26)
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(df26, mapping = aes(x=year, y=preds, col = "red")) + 
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category")
+```
+
+```{r}
+
+pw.model = piecewise.linear(df26$year, df26$AgeBinVolume, middle=1, CI=TRUE, sig.level = 0.05)
+pw.model
+```
+Now that we have a piecewise linear model, let's predict the volume of 26-35 year olds in years 2013 and 2014
+```{r}
+preds = predict(pw.model,c(1999:2014))
+predYears = c(1999:2014)
+dfPreds = data.frame(year = predYears, predAgeBinVolume = predict(pw.model,predYears))
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(dfPreds, mapping = aes(x=year, y=predAgeBinVolume, col = "red")) + 
+  geom_point(dfPreds[dfPreds$year %in% c(2013:2014), ], mapping = aes(x=year, y=predAgeBinVolume, col = "blue")) +
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category in years 2013 and 2014")
+```
+The actual predicted values for years 2013 and 2014
+```{r}
+predict(pw.model,c(2013:2014))
+```
+Let's look at average times of age 25-36 year olds
+```{r}
+dfAvgTimes26 = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(avgTime = mean(RawTime_M))
+dfAvgTimes26 = dfAvgTimes26[dfAvgTimes26$AgeBin == '26-35',]
+dfAvgTimes26 %>% ggplot(aes(x=year, y=avgTime/60)) + geom_point() + ggtitle("Average Race Time Per Year for 26-35 Age Category") + labs(y="Race Time (hr)")
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
