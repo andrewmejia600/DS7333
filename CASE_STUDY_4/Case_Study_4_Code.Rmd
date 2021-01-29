@@ -34,6 +34,7 @@ library(dplyr)
 library(states)
 library(ggplot2)
 library(ggthemes)
+library(SiZer)
 ```
 
 ```{r}
@@ -237,10 +238,12 @@ mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/
 womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
 ```
 
+### Preview of raw table scrapes
 ```{r}
 head(womens_table, n = 10)
 ```
 
+### Perform the table transformation and remove metadata columns and other columns 
 ```{r}
 cols_for_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source")
 mens_table_T = tableTransform(mens_table, cols_to_remove = all_of(cols_for_remove))
@@ -248,6 +251,7 @@ womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_r
 
 ```
 
+### Preview of the transformed table 
 ```{r}
 head(womens_table_T, n = 10)
 dim(womens_table_T)
@@ -257,6 +261,7 @@ dim(womens_table_T)
 summary(womens_table_T)
 ```
 
+### Preview of NA columns 
 ```{r}
 columns = c("Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
 
@@ -266,12 +271,13 @@ head(womens_table_T_na, n = 10)
 dim(womens_table_T_na)
 ```
 
+### Create a DF containing the NA counts of each feature
 ```{r}
 na_df = data.frame(rowsum(+(is.na(womens_table_T)), womens_table_T$year))
 na_df = cbind(year_idx = rownames(na_df), na_df)
 ```
 
-
+### Plots of prominate NA columns 
 ```{r}
 p1_na = ggplot(na_df, aes(x=year_idx, y=HomeTown)) + geom_bar(stat = "identity", fill = "grey") + labs(title = "Counts of missing HomeTown Records by Year") + xlab("Year Index") + ylab("Count of HomeTown")
 p1_na
@@ -289,6 +295,7 @@ womens_table_T = womens_table_T[complete.cases(womens_table_T), ]
 row.names(womens_table_T) = NULL 
 ```
 
+### Final dataframe metadata 
 ```{r}
 head(womens_table_T, n = 10)
 ```
@@ -300,6 +307,7 @@ womensTableInfo
 
 #############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
+### Generate plots of quick EDA for ages accross years 
 ```{r}
 plot_data_age = ggplot(womens_table_T, aes(x = year, y = Age)) + geom_boxplot() + labs(title = "Distribution of Women Participants Age by Year") + xlab("Year") + ylab("Age")
 
@@ -346,10 +354,6 @@ read the data into dataframe
 #womens_table_T = read.csv("C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", header=TRUE)
 ```
 
-Let's convert some of the data types to make the data easier to work with later
-```{r}
-womens_table_T = transform(womens_table_T, Race = as.factor(Race),Age = as.integer(Age), HTown = as.factor(HTown), HState = as.factor(HState), HCountry = as.factor(HCountry), year = as.factor(year) )
-```
 
 
 ```{r}
