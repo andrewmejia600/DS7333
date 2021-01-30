@@ -567,3 +567,17 @@ cpts.ts(dis.bs)
 plot(dis.bs, cpt.width = 3)
 ```
 You can see that this produced a single average.  This could be appropriately stating that nothing has statistically changed.  More likely, we do not have enough data points to find clean break points.
+
+Evaluating the out of state participation next, to address accommodations needed by the race sponsor.  Note, because the race is in DC, we also excluded participants in VA and MD.
+```{r}
+# looking at counts with division splits too
+plotdata = womens_table_T %>% filter(HomeState != "VA") %>% filter(HomeState != "MD") %>% filter(HomeState != "DC") %>%
+  group_by(year, HomeState) %>% 
+  summarise(count = n())
+
+p = plotdata %>% 
+  ggplot(aes(x = year, y = count, fill = HomeState)) + 
+  geom_bar(stat = "identity", position = "stack") 
+ggplotly(p)
+
+```
