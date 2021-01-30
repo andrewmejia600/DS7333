@@ -538,3 +538,32 @@ ggplot(dfAgg, aes(x=year, y=Proportion)) +
 
 So to summarize, it's expected that 50% of the runners will be in the 26-35 year old age group in 2013. The median race time will be 97-98 minutes or approximately 9.7 minute pace.  
 
+##########################Sabrina add on##########################################
+
+When we consider how things have changed, we were asked to look at the average racer time.  For that, we are going to first consider a LOESS prediction.  Because this is a nonparametric method, and will weight itself relative to time, we feel like this should give indication of whether or not the average runner is getting faster or slower.
+```{r}
+#Predict LOESS on time
+womens_table_T$RawTime_M = as.numeric(womens_table_T$RawTime_M) #need data to be numeric for LOESS
+womens_table_T$year = as.numeric(womens_table_T$year)  #need data to be numeric for LOESS
+plot(RawTime_M~year, ylim = c(94,100), data=womens_table_T, main="Year V Time")
+out <- loess(RawTime_M~year, data=womens_table_T)
+curve(predict(out, newdata=data.frame(year = x)), add=TRUE)
+```
+As shown above average time actually increased across the 14 year window, but did show a downturn in 2011 and 2012.  This indicates that the finishers may in fact be speeding back up again.
+
+Our next objective is to determine if anywhere along the way the average time has sectioned off in a way that indicates multiple trends.  For that, we will run a changepoint evaluation on the average.
+```{r}
+#Run a piecewise fit next
+plotdata = womens_table_T %>% 
+ group_by(year)   %>% 
+  summarise(average = mean(RawTime_M), .groups = "keep")
+
+plotdata$average = as.integer(plotdata$average)
+plotdata$average = as.ts(plotdata$average)
+
+library(changepoint)
+dis.bs <- cpt.meanvar(plotdata$average, test.stat = "Poisson", method = "BinSeg")
+cpts.ts(dis.bs)
+plot(dis.bs, cpt.width = 3)
+```
+You can see that this produced a single average.  This could be appropriately stating that nothing has statistically changed.  More likely, we do not have enough data points to find clean break points.
