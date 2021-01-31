@@ -568,7 +568,15 @@ plot(dis.bs, cpt.width = 3)
 ```
 You can see that this produced a single average.  This could be appropriately stating that nothing has statistically changed.  More likely, we do not have enough data points to find clean break points.
 
-Evaluating the out of state participation next, to address accommodations needed by the race sponsor.  Note, because the race is in DC, we also excluded participants in VA and MD.
+
+
+### Conclusion / Recommendations
+
+As mentioned in previous sections, the average age of the female runner has decreased in the last 14 years.  The average race time of participants has slowed, and the distribution has formed a wider, more even presentation. From this, we conclude that participation in this race has become more popular, and likely as much a social event as a competitive one.  As you look to advertise in the future, you should consider expansion of advertising into social media platforms, where you are likely to connect the most effectively with the demographic described above.   
+
+As with any expansion, planning must be taken into consideration for an enjoyable event.  In the 14 years we evaluated, your race participation size in females quadrupled.  We predict you will see over 10,000 female participants in the next year’s event.  You will need to consider the logistics in organizing to that scale.  You should anticipate needing 10% more staff on race day.  Volunteers to pass out water, hand out medals, and manage bag checks are one part of that increase.  You’ll also need additional police to help maintain crowd control.  If you provide pace runners, you should consider that in some of your highest volume pace groups, you may need an additional runner per assigned segment to ensure your participants are able to manage their positions. 
+
+Your site provides contact information for hotel accommodations booked at group rates.  In the last four years, out of state participation has doubled (based on excluding DC, VA, and MD).  Knowing that we expect participation to be higher next year, you should factor this into any hotel negotiations for the next event.  You must also ensure that you have sufficient parking, or shuttle service in place if you unable to allow participants and fans to park directly adjacent to the starting line. 
 ```{r}
 # looking at counts with division splits too
 plotdata = womens_table_T %>% filter(HomeState != "VA") %>% filter(HomeState != "MD") %>% filter(HomeState != "DC") %>%
@@ -581,3 +589,7 @@ p = plotdata %>%
 ggplotly(p)
 
 ```
+
+
+
+Finally, we recommend that you have contingencies for the unexpected.  A myriad of situations could cause this event to be delayed, postponed and even cancelled.  Coordinating 10,000 people converging on Washington DC is no small feat, and that is only your female participation.  Should you encounter a situation that makes it unsafe to gather, you need to have options available to participants.  If you entertain hosting a virtual run in lieu of gathering in person, you must consider the supply chain impacts of needing to distribute race swag and medals.  Ordering well in advance, and in bulk since you know your expected participation, will allow you the time needed to handle everyone’s participation memorabilia one extra time.   
