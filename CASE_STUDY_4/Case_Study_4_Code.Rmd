@@ -3,16 +3,19 @@ title: "Case_Study_4_Code"
 author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
 date: "`r Sys.time()`"
 output:
-  html_document:
+  pdf_document:
     toc: yes
-    toc_float: yes
-    toc_depth: 6
+    toc_depth: '6'
   github_document:
     toc: yes
     toc_depth: 6
   word_document:
     toc: yes
     toc_depth: '6'
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
 always_allow_html: yes
 ---
 ```{r setup, include=FALSE}
