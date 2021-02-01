@@ -1,0 +1,386 @@
+---
+title: "Case_Study_4_Code"
+author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  github_document:
+    toc: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+    toc_depth: '6'
+always_allow_html: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(hms)
+library(rvest)
+library(lubridate)
+library(foreach)
+library(stringr)
+library(iterators)
+library(progress)
+library(doParallel)
+library(doSNOW)
+library(dplyr)
+library(states)
+library(ggplot2)
+library(ggthemes)
+```
+
+```{r}
+years = c(1999:2012)
+division = 'Overall+Women'
+section = '10M' 
+sex = 'W'
+```
+
+#### Functions
+
+#The gen_Link function will generates the link with the query parameters for the searchable database
+
+```{r}
+gen_Link = function(year,division,section,page=1,sex){
+
+  paste0( 'http://www.cballtimeresults.org/performances'
+          ,'?division=',division,'&page=',page,
+          '&section=',section, '&sex=',sex, 
+          '&utf8=%E2%9C%93','&year=',year)
+          #,'?utf8=%E2%9C%93&section=',section
+          #,'&year=',year,'&division=',division,'&page=', page)
+
+}
+
+```
+
+# The gen_Table function will parse through the table of 20 records and 15 observations
+# and parse the table into its own data frame from xml2 read)html function and then use 
+# the pipe operator to use rvest nodes to find the table structure 
+# then the fucntion will insert the metadata for the query parameters of year, division, section, page, source link and sex 
+```{r}
+gen_Table = function(year,division,section,page, sex){
+  
+  
+  #use gen_link function to get link to page 
+  genlink=gen_Link(year,division,section,page=page, sex=sex)
+  
+  #read the page, and grab to 'table' tag
+  single_table = xml2::read_html(genlink) %>% 
+    rvest::html_nodes("table")  %>% 
+    rvest::html_table(fill=TRUE) 
+  
+  #get the table and add metadata for the query parameters
+  table_out = single_table[[1]] %>% 
+    mutate(year=year, divisionTitle=division, section=section, page=page, source=genlink, sex = sex)
+  
+}
+
+```
+
+# This function will use all available cores on machine
+# It will process the years in parrell. 
+# This code has been adapted from 
+# https://github.com/ngupta23/ds7333_qtw/blob/master/case_study_2/submission_Kannan_Moro_Gupta/code/CS2_ETL.Rmd 
+# https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+# https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+# https://cran.r-project.org/web/packages/progress/progress.pdf
+# https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+
+
+```{r}
+scrapeTables  = function(years,division,section, sex,  max_itr = 500){
+  
+  
+library(progress)
+library(doParallel)
+library(doSNOW)  
+  
+    #Initialize Parrellel Process to detect number of cores 
+    #https://cran.r-project.org/web/packages/doSNOW/doSNOW.pdf
+    #https://stackoverflow.com/questions/36794063/r-foreach-from-single-machine-to-cluster
+  
+    #Generate and register initial clusters based on cores, otherwise, this is a long process 
+    cl = makeCluster(detectCores())
+    doSNOW::registerDoSNOW(cl)
+    
+    #Generate progress bar for the parallel loop based on number of years 
+    #https://cran.r-project.org/web/packages/progress/progress.pdf
+    progBar = progress::progress_bar$new(total = length(years),format='[:bar] :percent :eta')
+    progress = function(n) progBar$tick()
+    
+    #Initialize a parallel loop per each year
+    #Intialize tableRaw as empty to loop to be populated as a table dataframe from gen_Table function
+    tableRaw=NULL
+    
+    #tableRaw will now use for each using years as the iterator to use .combine to rbind
+    #.export will do the gen_Table and gen_Link functions simultanlously and 
+    #options.snow will show the progress bar
+    # the %dopar% will process all the years simultaneously. 
+    #https://www.r-bloggers.com/2013/08/the-wonders-of-foreach/
+    tableRaw = foreach(y=years
+                      ,.combine=rbind,.export=c('gen_Table','gen_Link')
+                      ,.options.snow = list(progress=progress)) %dopar%
+      {
+        
+        library(foreach)
+        library(dplyr)
+        #intialize isCompleted variable as FALSE for bool conditions to see if loop has been completed
+        isCompleted=FALSE
+        
+        #Initiate loop since most pages are 487, we will only loop for the iterations for max_itr
+        tableRaw=foreach(p=c(1:max_itr),.combine=rbind) %do% 
+          if(!isCompleted) {
+            message('getting year:',y, ' page:',p,appendLF = F)
+            #get the table of the current page
+            table = gen_Table(year=y
+                             ,division=division
+                             ,section=section
+                             ,page=p
+                             ,sex=sex)
+            message(' rows:',nrow(table))
+            isCompleted = nrow(table)==0 #if there is record, we are at the last page, no need to read further
+            return(table)
+          }
+        return(tableRaw)
+      }
+    #Deactivate the cluster of cores
+    stopCluster(cl)
+    #save the raw data to rda format for later processing based on gender
+    saveRDS(tableRaw,file=paste0('CB',sex,'tableRaw.rds'))
+    
+  return(tableRaw)
+}
+  
+ 
+```
+
+### The purpose of this function is to transform the raw tables from the scrape ###
+### https://stackoverflow.com/questions/50040968/convert-a-duration-hms-to-seconds ### 
+### https://stackoverflow.com/questions/10835908/is-there-a-way-to-convert-mmss-00-to-seconds-00 ### 
+### https://stackoverflow.com/questions/24173194/remove-parentheses-and-text-within-from-strings-in-r  ###
+
+```{r}
+tableTransform =function(data_df, cols_to_remove=NULL){
+  dataDF = data_df %>% 
+    #Seperate Home town into seperate columns
+    separate(col = 'Hometown', c('HomeTown', 'HomeState'), sep = ',', extra = 'merge', remove = TRUE, fill = 'right') %>% 
+    #Seperate PiS/TiS into seperate columns 
+    separate(col='PiS/TiS',c('PiS','TiS'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    #Seperate PiD/TiD into seperate columns 
+    separate(col='PiD/TiD',c('PiD','TiD'),sep='\\/'
+             ,extra='drop',remove=TRUE) %>% 
+    #Trim the casted upper HomeTown strings of whitespace 
+    mutate(HomeTown = toupper(trimws(HomeTown))
+           , HomeState = toupper(trimws(HomeState))
+           , HomeTown = ifelse(HomeTown %in% c('NR', '', NULL), NA, toupper(trimws(HomeTown)))
+           , HomeState = ifelse(HomeState %in% c('NR', '', NULL), NA, toupper(trimws(HomeState)))
+           #Check if HomeState is in state.abb or DC and return USA else return the HomeTown as the Country
+           , HomeCountry = ifelse(HomeState %in% c(state.abb, "DC"), "USA", HomeTown)
+           #Remove White Space
+           , PiS = ifelse(trimws(PiS) %in% c('NR', '', NULL), NA, trimws(PiS))
+           , TiS = ifelse(trimws(TiS) %in% c('NR', '', NULL), NA, trimws(TiS))
+           , PiD = ifelse(trimws(PiD) %in% c('NR', '', NULL), NA, trimws(PiD))
+           , TiD = ifelse(trimws(TiD) %in% c('NR', '', NULL), NA, trimws(TiD))
+           , Division = ifelse(trimws(Division) %in% c('NR', '', NULL), NA, trimws(Division))
+           # Normalize Time to seconds and minutes 
+           , RawTime = strptime(Time, format='%H:%M:%S')
+           , RawTime_S = RawTime$hour * 3600 + RawTime$min * 60 + RawTime$sec 
+           , RawTime_M = as.numeric(RawTime_S)/60
+           , RawPace = strptime(Pace, format = "%M:%OS")
+           , RawPace_S = RawPace$min * 60 + RawPace$sec 
+           #Normalize Age where 'NR' as NA 
+           , Age = ifelse(Age %in% c("NR"), NA, Age)
+           #Cast Variables as appropriate dtypes 
+           , Age = as.numeric(Age)
+           , RawTime_S = as.numeric(RawTime_S)
+           , RawPace_S = as.numeric(RawPace_S)
+           , RawPace_M = as.numeric(RawPace_S)/60
+           , year = as.factor(year)
+           #Remove the (<Sex>) from the names
+           #, Name = str_replace(Name, " \\s*\\([^\\)]+\\)", '')
+           )
+  #Remove columns we do not want 
+  dataDF = dataDF %>% select (-all_of(c(cols_to_remove)))
+                  
+  return(dataDF %>% select(c( Age, year,  HomeTown, HomeState, HomeCountry, RawTime_S, RawTime_M, RawPace_S, RawPace_M, sex, section, PiS, TiS, PiD, TiD)))
+}
+```
+
+
+
+### Perform Scrape ### 
+
+### Caution takes a long time without hexacore machine ### 
+```{r}
+#Women_table = scrapeTables(years=years,division = division,section=section,sex = sex, max_itr = 500)
+```
+
+```{r}
+#men_table = scrapeTables(years=years,division = 'Overall+Men',section=section,sex = "M", max_itr = 500)
+
+```
+
+### Load tables from file ### 
+
+```{r}
+mens_table <- readRDS("C:/Users/seans/Desktop/QTW/Case Study 4 Misc/CBMtableRaw.rds")
+
+womens_table <- readRDS("C:/Users/seans/Desktop/QTW/Case Study 4 Misc/CBWtableRaw.rds")
+```
+
+```{r}
+view(head(womens_table, n = 10))
+```
+
+```{r}
+cols_for_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source")
+mens_table_T = tableTransform(mens_table, cols_to_remove = all_of(cols_for_remove))
+womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_remove))
+
+```
+
+```{r}
+head(womens_table_T, n = 10)
+```
+
+```{r}
+summary(womens_table_T)
+```
+
+```{r}
+columns = c("Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
+
+womens_table_T_na = womens_table_T %>% filter_at(vars(all_of(columns)),any_vars(is.na(.)))
+
+womens_table_T_na
+```
+
+```{r}
+na_df = data.frame(rowsum(+(is.na(womens_table_T)), womens_table_T$year))
+na_df = cbind(year_idx = rownames(na_df), na_df)
+```
+
+
+```{r}
+p1_na = ggplot(na_df, aes(x=year_idx, y=HomeTown)) + geom_bar(stat = "identity", fill = "grey") + labs(title = "Counts of missing HomeTown Records by Year") + xlab("Year Index") + ylab("Count of HomeTown")
+p1_na
+```
+
+```{r}
+p2_na = ggplot(na_df, aes(x=year_idx, y=HomeState)) + geom_bar(stat = "identity", fill = "grey") +  labs(title = "Counts of missing HomeState Records by Year") + xlab("Year Index") + ylab("Count of HomeState")
+
+p2_na
+```
+
+## We will remove NAs and only focus on completed records and rewmove NAs for further processing and reindex the table. 
+```{r}
+womens_table_T = womens_table_T[complete.cases(womens_table_T), ]
+row.names(womens_table_T) = NULL 
+```
+
+```{r}
+head(womens_table_T, n = 10)
+```
+```{r}
+womensTableInfo = data.frame(Variable = names(womens_table_T),Type = sapply(womens_table_T, typeof), row.names = NULL)
+womensTableInfo
+```
+
+#############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+
+```{r}
+plot_data_age = ggplot(womens_table_T, aes(x = year, y = Age)) + geom_boxplot() + labs(title = "Distribution of Women Participants Age by Year") + xlab("Year") + ylab("Age")
+
+plot_data_age
+```
+
+```{r}
+plot_data_time = ggplot(womens_table_T, aes(x = year, y = RawTime_M)) + geom_boxplot() + labs(title = "Distribution of Women Raw Time by Year") + xlab("Year") + ylab("Minutes")
+
+plot_data_time
+```
+
+```{r}
+plot_data_Pace = ggplot(womens_table_T, aes(x = year, y = RawPace_M)) + geom_boxplot() + labs(title = "Distribution of Women Raw Pace by Year") + xlab("Year") + ylab("Minutes")
+
+
+plot_data_Pace
+```
+
+
+######################################################## Sean's Visuals ##################################################################
+
+
+```{r}
+#Participation by year
+#https://stackoverflow.com/questions/26114525/how-to-count-how-many-values-per-level-in-a-given-factor
+
+library(dplyr)
+womens_table_T %>% group_by(year) %>% summarize(cnt = Age) %>% ggplot(aes(x = year)) + geom_bar(fill = 'springgreen4') + labs(title = "Participation by Year")
+```
+
+```{r}
+#Doesn't work--Division not in the final DF
+
+#Division count by year
+#ggplot(womens_table_T, aes(Division)) + geom_bar() + facet_wrap(~year) + theme(axis.text = element_text(angle = 90, vjust = .05, hjust=1))
+
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawTime_M)) + geom_density(aes(fill=year), alpha=0.4) + labs(title = "Female Time by Year")
+
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawPace_M)) + geom_density(aes(fill=year), alpha=0.4)+ labs(title = "Female Pace Distributions by Year")
+
+```
+
+
+```{r}
+#Age by year
+#https://stackoverflow.com/questions/14623348/how-to-use-facet-to-create-multiple-density-plot-in-ggplot
+ggplot(data=womens_table_T, aes(x=Age)) + geom_density(aes(fill=year), alpha=0.4)+  labs(title = "Female Age Distributions by Year") 
+
+```
+
+```{r}
+#Time by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawTime_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Time by Year")
+```
+
+
+
+```{r}
+#Pace by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawPace_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Pace by Year")
+```
+
+
+```{r}
+
+library(ggplot2)
+library(ggthemes)
+
+#Age by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = Age)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Age by Year")
+
+```
+
