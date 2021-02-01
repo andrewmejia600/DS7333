@@ -3,19 +3,19 @@ title: "Case_Study_4_Code"
 author: "Brian Gaither, Sean Mcwhirter, Andrew Mejia, Sabrina Purvis"
 date: "`r Sys.time()`"
 output:
-  pdf_document:
+  html_document:
     toc: yes
-    toc_depth: '6'
+    toc_float: yes
+    toc_depth: 6
   github_document:
     toc: yes
     toc_depth: 6
   word_document:
     toc: yes
     toc_depth: '6'
-  html_document:
+  pdf_document:
     toc: yes
-    toc_float: yes
-    toc_depth: 6
+    toc_depth: '6'
 always_allow_html: yes
 ---
 ```{r setup, include=FALSE}
@@ -541,6 +541,65 @@ ggplot(dfAgg, aes(x=year, y=Proportion)) +
 ```
 
 So to summarize, it's expected that 50% of the runners will be in the 26-35 year old age group in 2013. The median race time will be 97-98 minutes or approximately 9.7 minute pace.  
+
+
+######################################################## Sean's Visuals ##################################################################
+
+
+```{r}
+#Participation by year
+#https://stackoverflow.com/questions/26114525/how-to-count-how-many-values-per-level-in-a-given-factor
+library(dplyr)
+womens_table_T %>% group_by(year) %>% summarize(cnt = Age) %>% ggplot(aes(x = year)) + geom_bar(fill = 'springgreen4') + labs(title = "Participation by Year")
+```
+
+```{r}
+#Doesn't work--Division not in the final DF
+#Division count by year
+#ggplot(womens_table_T, aes(Division)) + geom_bar() + facet_wrap(~year) + theme(axis.text = element_text(angle = 90, vjust = .05, hjust=1))
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawTime_M)) + geom_density(aes(fill=year), alpha=0.4) + labs(title = "Female Time by Year")
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawPace_M)) + geom_density(aes(fill=year), alpha=0.4)+ labs(title = "Female Pace Distributions by Year")
+```
+
+
+```{r}
+#Age by year
+#https://stackoverflow.com/questions/14623348/how-to-use-facet-to-create-multiple-density-plot-in-ggplot
+ggplot(data=womens_table_T, aes(x=Age)) + geom_density(aes(fill=year), alpha=0.4)+  labs(title = "Female Age Distributions by Year") 
+```
+
+```{r}
+#Time by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawTime_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Time by Year")
+```
+
+
+
+```{r}
+#Pace by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawPace_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Pace by Year")
+```
+
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+#Age by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = Age)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Age by Year")
+```
 
 ##########################Sabrina add on##########################################
 
