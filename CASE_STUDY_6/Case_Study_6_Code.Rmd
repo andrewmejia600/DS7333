@@ -27,7 +27,7 @@ library(tm)
 ```
 
 ```{r}
-spamPath = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6"
+spamPath = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/SpamAssassinMessages"
 list.dirs(spamPath, full.names = FALSE)
 ```
 
@@ -188,6 +188,10 @@ getBoundary = function(header) {
   boundary = gsub('"', "", header[boundaryIdx])
   gsub(".*boundary= *([^;]*);?.*", "\\1", boundary)
 }
+```
+
+```{r}
+sampleSplit[[6]]$body
 ```
 
 
