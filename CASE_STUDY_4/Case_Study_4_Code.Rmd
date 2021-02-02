@@ -13,6 +13,9 @@ output:
   word_document:
     toc: yes
     toc_depth: '6'
+  pdf_document:
+    toc: yes
+    toc_depth: '6'
 always_allow_html: yes
 ---
 ```{r setup, include=FALSE}
@@ -34,6 +37,8 @@ library(dplyr)
 library(states)
 library(ggplot2)
 library(ggthemes)
+library(SiZer)
+library(plotly)
 ```
 
 ```{r}
@@ -237,10 +242,12 @@ mens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/
 womens_table <- readRDS("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_4/CBWtableRaw.rds")
 ```
 
+### Preview of raw table scrapes
 ```{r}
 head(womens_table, n = 10)
 ```
 
+### Perform the table transformation and remove metadata columns and other columns 
 ```{r}
 cols_for_remove = c("divisionTitle", "source", "Pace", "Time", "RawTime", "RawPace", "page", "Race", "source")
 mens_table_T = tableTransform(mens_table, cols_to_remove = all_of(cols_for_remove))
@@ -248,6 +255,7 @@ womens_table_T = tableTransform(womens_table, cols_to_remove = all_of(cols_for_r
 
 ```
 
+### Preview of the transformed table 
 ```{r}
 head(womens_table_T, n = 10)
 dim(womens_table_T)
@@ -257,6 +265,7 @@ dim(womens_table_T)
 summary(womens_table_T)
 ```
 
+### Preview of NA columns 
 ```{r}
 columns = c("Age", "year",  "HomeTown", "HomeState", "HomeCountry", "RawTime_S", "RawTime_M", "RawPace_S", "RawPace_M", "sex", "section", "PiS", "TiS", "PiD", "TiD")
 
@@ -266,12 +275,13 @@ head(womens_table_T_na, n = 10)
 dim(womens_table_T_na)
 ```
 
+### Create a DF containing the NA counts of each feature
 ```{r}
 na_df = data.frame(rowsum(+(is.na(womens_table_T)), womens_table_T$year))
 na_df = cbind(year_idx = rownames(na_df), na_df)
 ```
 
-
+### Plots of prominate NA columns 
 ```{r}
 p1_na = ggplot(na_df, aes(x=year_idx, y=HomeTown)) + geom_bar(stat = "identity", fill = "grey") + labs(title = "Counts of missing HomeTown Records by Year") + xlab("Year Index") + ylab("Count of HomeTown")
 p1_na
@@ -289,6 +299,7 @@ womens_table_T = womens_table_T[complete.cases(womens_table_T), ]
 row.names(womens_table_T) = NULL 
 ```
 
+### Final dataframe metadata 
 ```{r}
 head(womens_table_T, n = 10)
 ```
@@ -300,6 +311,7 @@ womensTableInfo
 
 #############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
+### Generate plots of quick EDA for ages accross years 
 ```{r}
 plot_data_age = ggplot(womens_table_T, aes(x = year, y = Age)) + geom_boxplot() + labs(title = "Distribution of Women Participants Age by Year") + xlab("Year") + ylab("Age")
 
@@ -318,3 +330,329 @@ plot_data_Pace = ggplot(womens_table_T, aes(x = year, y = RawPace_M)) + geom_box
 
 plot_data_Pace
 ```
+
+##########################################################################################################################################################################################################################################################################################################################################################
+BRIAN GAITHER
+#############################################################################################################################################################################
+#############################################################################################################################################################################
+
+Creating an age bin column for analysis
+```{r}
+womens_table_T$AgeBin = cut(womens_table_T$Age, breaks=c(0,5,15,25,35,45,55,65,75,85,95),labels=c("1-5","6-15","16-25","26-35","36-45","46-55","56-65","66-75","76-85","86-95"))
+```
+
+Creating a column to bin the pace in minutes for later analysis
+```{r}
+womens_table_T$PaceBin = cut(womens_table_T$RawPace_M, breaks=c(0,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,14,18), 
+                 labels=c("1-5","5.1-5.5","5.5-6","6-6.5","6.5-7","7-7.5","7.5-8","8-8.5","8.5-9","9-9.5","9.5-10","10-10.5","10.5-11","11-11.5","11.5-12","12-12.5","12.5-13","13-13.5","13.5-14","11-18"))
+
+```
+
+write out the dataframe for later retrieval
+```{r}
+#write.csv(womens_table_T,"C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", row.names = FALSE)
+```
+
+read the data into dataframe
+```{r}
+#womens_table_T = read.csv("C:/Users/blgai/OneDrive/Documents/School/SMU/Spring 2021/Quantifying the World/Case4/files/women_data.csv", header=TRUE)
+```
+
+
+
+```{r}
+ggplot(womens_table_T, aes(x = Age, y=RawTime_M)) + 
+  geom_hex() +
+  theme_bw() + 
+  labs(title="Scatter Plot of Female Runners:  Age vs Time in Minutes")
+
+```
+```{r}
+f = ggplot(womens_table_T)
+f + geom_boxplot(mapping = aes(x=AgeBin, y=RawTime_M)) + theme_classic() + labs(title="Boxplot of Age Group by Running Time (Minutes)")
+```
+
+Let's examine overall runner volume
+```{r}
+dfRunVol = womens_table_T %>% group_by(year) %>% tally()
+dfRunVol$year = as.integer(dfRunVol$year)
+names(dfRunVol)[2] <- "RunnerVolume"
+head(dfRunVol)
+```
+
+Plotting out volume of runners by year
+```{r}
+ggplot(dfRunVol, aes(x=year, y=RunnerVolume)) +
+  geom_col() +
+  labs(title="Volume of runners by year") +
+geom_text(aes(label = RunnerVolume), vjust = -0.5)
+```
+let's see how well we can predict the volume of racers in the 15th year
+```{r}
+
+
+lmRunVol = lm(RunnerVolume ~ year, data = dfRunVol)
+lmRunVol$coefficients
+
+```
+Below we see we have a statistically significant slope and intercept
+```{r}
+summary(lmRunVol)
+```
+
+See how well our line fits
+```{r}
+preds = predict(lmRunVol)
+ggplot(dfRunVol, aes(x=year, y=RunnerVolume)) + geom_point() + geom_line(dfRunVol, mapping = aes(x=year, y=preds, col = "red")) + ggtitle("Prediction of Runner Volume")
+```
+
+
+How many runners are predicted to attend in 2013 (year 15)
+```{r}
+y_hat = 800.5 + (15*613.4)
+
+print(paste0("Predicted volume of runners in 2013 is: ", y_hat))
+```
+
+
+95% confidence intervals
+```{r}
+dfNew = data.frame(year=15)
+predict(lmRunVol, newdata = dfNew, interval = 'confidence')
+```
+
+we can see below that the IQR of running times throughout the years has remained relatively constant.  That means that
+```{r}
+f = ggplot(womens_table_T)
+f + geom_boxplot(mapping = aes(x=year, y=RawTime_M)) + theme_classic() + labs(title="Boxplot of Running Time (Minutes) by Year")
+```
+
+
+Let's look at the volume of runners by pace bin.  We can see that the majority of runners are between 8-11 minute pace.  This means that a large swell of runners will be running through the course together and race support must have enough volunteers to support the increase of runners as they make their way through the course.
+```{r}
+womens_table_T$PaceBin <- as.character(womens_table_T$PaceBin)
+womens_table_T$PaceBin <- factor(womens_table_T$PaceBin, levels=unique(womens_table_T$PaceBin))
+
+ggplot(womens_table_T %>% group_by(year, PaceBin) %>% tally()) +
+  geom_col(mapping = aes(x=PaceBin, y=n)) +
+  facet_grid(vars(year)) +
+  labs(title="Distribution of pace throughout the years")
+
+```
+
+Let's take a look at the median pace per year.
+```{r}
+womens_table_T %>% group_by(year) %>% dplyr::summarise(median_pace = median(RawPace_M)) %>% ggplot(aes(x=year, y=median_pace)) + geom_point() + ggtitle("Median Pace Per Year")
+```
+
+If we look at the max times throughout the years, there isn't a consistent pattern observable, we'll revisit this after looking more at the age bins further
+```{r}
+womens_table_T %>% group_by(year) %>% dplyr::summarise(max_time = max( RawTime_M )) %>% ggplot(aes(x=year, y=max_time)) + geom_point()
+```
+
+we see below that there has been a steady increase in 26-35 year old runners over the years
+```{r}
+ggplot(womens_table_T %>% group_by(year, AgeBin) %>% tally()) +
+  geom_col(mapping = aes(x=AgeBin, y=n)) +
+  facet_grid(vars(year)) +
+  labs(title="Distribution of age throughout the years")
+
+```
+Let's take a closer look at the volume of runners in the 26-35 age category
+```{r}
+dfRunAgeBinVol = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(AgeBinVolume = n()) 
+head(dfRunAgeBinVol)
+ggplot(dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]) +
+  geom_point(mapping = aes(x=year, y=AgeBinVolume)) +
+  #facet_wrap(vars(year)) +
+  labs(title="Increase in volume of 26-35 age group throughout the years")
+```
+
+```{r}
+dfRunAgeBinVol$year = as.numeric(as.character(dfRunAgeBinVol$year))
+dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+```
+Let's trend the volume of 26-35 year old runners using LOESS
+```{r}
+df26 = dfRunAgeBinVol[dfRunAgeBinVol$AgeBin == '26-35',]
+loessAge26 = loess(AgeBinVolume ~year, data=df26)
+preds = predict(loessAge26)
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(df26, mapping = aes(x=year, y=preds, col = "red")) + 
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category")
+```
+Let's now try to predict the volume of 26-35 year olds using a piece wise linear regression model
+```{r}
+
+pw.model = piecewise.linear(df26$year, df26$AgeBinVolume, middle=1, CI=TRUE, sig.level = 0.05)
+pw.model
+```
+
+Now that we have a piece wise linear model, let's predict the volume of 26-35 year olds in years 2013 and 2014
+```{r}
+preds = predict(pw.model,c(1999:2014))
+predYears = c(1999:2014)
+dfPreds = data.frame(year = predYears, predAgeBinVolume = predict(pw.model,predYears))
+ggplot(df26, aes(x=year, y=AgeBinVolume)) + 
+  geom_point() + 
+  geom_line(dfPreds, mapping = aes(x=year, y=predAgeBinVolume, col = "red")) + 
+  geom_point(dfPreds[dfPreds$year %in% c(2013:2014), ], mapping = aes(x=year, y=predAgeBinVolume, col = "blue")) +
+  ggtitle("Prediction of Runner Volume in 26-35 Age Category in years 2013 and 2014")
+```
+
+The actual predicted values for years 2013 and 2014.  This is what we want to share with the race management team
+```{r}
+predict(pw.model,c(2013:2014))
+```
+
+Let's look at average times of age 25-36 year olds
+```{r}
+dfAvgTimes26 = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(avgTime = mean(RawTime_M))
+dfAvgTimes26 = dfAvgTimes26[dfAvgTimes26$AgeBin == '26-35',]
+dfAvgTimes26 %>% ggplot(aes(x=year, y=avgTime/60)) + geom_point() + ggtitle("Average Race Time Per Year for 26-35 Age Category") + labs(y="Race Time (hr)")
+```
+
+let's get a look at the pace of 26-35 year olds.  over the years, they've held a pretty consistent pace.  50% are in the 9-10 minute pace group.
+```{r}
+f = ggplot(womens_table_T %>% filter(womens_table_T$AgeBin == "26-35"))
+f + geom_boxplot(mapping = aes(x=year, y=RawPace_M)) + theme_classic() + labs(title="Boxplot of Pace (Minutes) by Year for 26-35 aged runners")
+```
+
+Let's look at median times of age 25-36 year olds
+```{r}
+dfMedTimes26 = womens_table_T %>% group_by(year, AgeBin) %>% dplyr::summarise(medTime = median(RawTime_M))
+dfMedTimes26 = dfMedTimes26[dfMedTimes26$AgeBin == '26-35',]
+dfMedTimes26 %>% ggplot(aes(x=year, y=medTime/60)) + geom_point() + ggtitle("Median Race Time Per Year for 26-35 Age Category") + labs(y="Race Time (hr)")  +
+geom_text(aes(label = medTime), vjust = -0.5)
+```
+
+
+
+Let's look at the proportion the 26-35 year olds make up of the total runners over the years. As of 2012, this age group makes up about 50% of all runners.  
+```{r}
+dfAgg = womens_table_T %>% filter(womens_table_T$AgeBin == "26-35") %>% group_by(year, AgeBin) %>% dplyr::summarise(AgeBinVolume = n())
+dfAgg$TotalRunners = (womens_table_T %>% group_by(year) %>% dplyr::summarise(TotalRunners = n()))$TotalRunners
+dfAgg$Proportion = dfAgg$AgeBinVolume / dfAgg$TotalRunners
+
+ggplot(dfAgg, aes(x=year, y=Proportion)) +
+  geom_col() +
+  labs(title="Proportion of 26-35 year old runners by year") 
+```
+
+So to summarize, it's expected that 50% of the runners will be in the 26-35 year old age group in 2013. The median race time will be 97-98 minutes or approximately 9.7 minute pace.  
+
+
+######################################################## Sean's Visuals ##################################################################
+
+
+```{r}
+#Participation by year
+#https://stackoverflow.com/questions/26114525/how-to-count-how-many-values-per-level-in-a-given-factor
+library(dplyr)
+womens_table_T %>% group_by(year) %>% summarize(cnt = Age) %>% ggplot(aes(x = year)) + geom_bar(fill = 'springgreen4') + labs(title = "Participation by Year")
+```
+
+```{r}
+#Doesn't work--Division not in the final DF
+#Division count by year
+#ggplot(womens_table_T, aes(Division)) + geom_bar() + facet_wrap(~year) + theme(axis.text = element_text(angle = 90, vjust = .05, hjust=1))
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawTime_M)) + geom_density(aes(fill=year), alpha=0.4) + labs(title = "Female Time by Year")
+```
+
+
+```{r}
+#Pace by year
+ggplot(data=womens_table_T, aes(x=RawPace_M)) + geom_density(aes(fill=year), alpha=0.4)+ labs(title = "Female Pace Distributions by Year")
+```
+
+
+```{r}
+#Age by year
+#https://stackoverflow.com/questions/14623348/how-to-use-facet-to-create-multiple-density-plot-in-ggplot
+ggplot(data=womens_table_T, aes(x=Age)) + geom_density(aes(fill=year), alpha=0.4)+  labs(title = "Female Age Distributions by Year") 
+```
+
+```{r}
+#Time by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawTime_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Time by Year")
+```
+
+
+
+```{r}
+#Pace by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = RawPace_M)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Pace by Year")
+```
+
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+#Age by year
+ggplot(data = womens_table_T, mapping = aes(x = year, y = Age)) +
+      geom_jitter(alpha = 0.3, color = "tomato") + geom_boxplot(alpha = 0) + theme_economist() + labs(title = "Female Age by Year")
+```
+
+##########################Sabrina add on##########################################
+
+When we consider how things have changed, we were asked to look at the average racer time.  For that, we are going to first consider a LOESS prediction.  Because this is a nonparametric method, and will weight itself relative to time, we feel like this should give indication of whether or not the average runner is getting faster or slower.
+```{r}
+#Predict LOESS on time
+womens_table_T$RawTime_M = as.numeric(womens_table_T$RawTime_M) #need data to be numeric for LOESS
+womens_table_T$year = as.numeric(womens_table_T$year)  #need data to be numeric for LOESS
+plot(RawTime_M~year, ylim = c(94,100), data=womens_table_T, main="Year V Time")
+out <- loess(RawTime_M~year, data=womens_table_T)
+curve(predict(out, newdata=data.frame(year = x)), add=TRUE)
+```
+As shown above average time actually increased across the 14 year window, but did show a downturn in 2011 and 2012.  This indicates that the finishers may in fact be speeding back up again.
+
+Our next objective is to determine if anywhere along the way the average time has sectioned off in a way that indicates multiple trends.  For that, we will run a changepoint evaluation on the average.
+```{r}
+#Run a piecewise fit next
+plotdata = womens_table_T %>% 
+ group_by(year)   %>% 
+  summarise(average = mean(RawTime_M), .groups = "keep")
+
+plotdata$average = as.integer(plotdata$average)
+plotdata$average = as.ts(plotdata$average)
+
+library(changepoint)
+dis.bs <- cpt.meanvar(plotdata$average, test.stat = "Poisson", method = "BinSeg")
+cpts.ts(dis.bs)
+plot(dis.bs, cpt.width = 3)
+```
+You can see that this produced a single average.  This could be appropriately stating that nothing has statistically changed.  More likely, we do not have enough data points to find clean break points.
+
+
+
+### Conclusion / Recommendations
+
+As mentioned in previous sections, the average age of the female runner has decreased in the last 14 years.  The average race time of participants has slowed, and the distribution has formed a wider, more even presentation. From this, we conclude that participation in this race has become more popular, and likely as much a social event as a competitive one.  As you look to advertise in the future, you should consider expansion of advertising into social media platforms, where you are likely to connect the most effectively with the demographic described above.   
+
+As with any expansion, planning must be taken into consideration for an enjoyable event.  In the 14 years we evaluated, your race participation size in females quadrupled.  We predict you will see over 10,000 female participants in the next year’s event.  You will need to consider the logistics in organizing to that scale.  You should anticipate needing 10% more staff on race day.  Volunteers to pass out water, hand out medals, and manage bag checks are one part of that increase.  You’ll also need additional police to help maintain crowd control.  If you provide pace runners, you should consider that in some of your highest volume pace groups, you may need an additional runner per assigned segment to ensure your participants are able to manage their positions. 
+
+Your site provides contact information for hotel accommodations booked at group rates.  In the last four years, out of state participation has doubled (based on excluding DC, VA, and MD).  Knowing that we expect participation to be higher next year, you should factor this into any hotel negotiations for the next event.  You must also ensure that you have sufficient parking, or shuttle service in place if you unable to allow participants and fans to park directly adjacent to the starting line. 
+```{r}
+# looking at counts with division splits too
+plotdata = womens_table_T %>% filter(HomeState != "VA") %>% filter(HomeState != "MD") %>% filter(HomeState != "DC") %>%
+  group_by(year, HomeState) %>% 
+  summarise(count = n())
+
+p = plotdata %>% 
+  ggplot(aes(x = year, y = count, fill = HomeState)) + 
+  geom_bar(stat = "identity", position = "stack") 
+ggplotly(p)
+
+```
+
+
+
+Finally, we recommend that you have contingencies for the unexpected.  A myriad of situations could cause this event to be delayed, postponed and even cancelled.  Coordinating 10,000 people converging on Washington DC is no small feat, and that is only your female participation.  Should you encounter a situation that makes it unsafe to gather, you need to have options available to participants.  If you entertain hosting a virtual run in lieu of gathering in person, you must consider the supply chain impacts of needing to distribute race swag and medals.  Ordering well in advance, and in bulk since you know your expected participation, will allow you the time needed to handle everyone’s participation memorabilia one extra time.   
