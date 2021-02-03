@@ -19,14 +19,84 @@ always_allow_html: yes
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r library, include=FALSE, warning=FALSE}
 library(tidyverse)
 library(rpart)
 library(tm)
+library(tidyverse)
+library(randomForest)
+library(caret)
+library(knitr)
+library(kableExtra)
+library(XML)
+library(stringr)
+library(dplyr)
+library(corrplot)
+library(rpart)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+library(dplyr)
+library(ggraph)
+library(igraph)
 
 ```
 
 ```{r}
 file_ext = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/"
 data = load(paste0(file_ext, "data.Rda"))
+data = cbind(Email_Loc = rownames(emailDFrp), emailDFrp)
+rownames(data) = 1:nrow(data) 
+```
+
+```{r}
+Descriptions = c('Multi-Level Factor Email Name', 'Binary Factor is Spam T/F', 'Binary Factor isRe ** T/F' , 'Binary Factor has Underscore T/F' , 
+                 'Binary Factor Priority T/F', 'Binary Factor is Replying T/F', 'Binary Factor Sorted Received ** T/F', 
+                 'Binary Factor SubPunc **T/F', 'Binary Factor Multi Part Text T/F', 'Binary Factor Has Image in Email T/F', 
+                 'Binary Factor is PGPsinged ** T/F', 'Binary Factor is SubSpamWords ** T/F', 'Binary Factor No Host ** T/F', 
+                 'Binary Factor numEnd** T/F', 'Binary Factor is Yelling T/F', 'Binary Factor is Orignal Message T/F', 
+                 'Binary Factor is Dear** T/F', 'Binary Factor is Wrote ** T/F', 'Email Line Count', 
+                 'Body Character Count', 'SubExc ** Count', 'Sub Queues ** Count', 'Number of ATT **', 'Number of Receipts **', 
+                 'Number of Caps **' , 'Hour **', 'PerHTML **' , 'SubBlanks **', 'Fowards **', 'Average word Length', 
+                 'Number of Dlr **' )
+emailTableInfo = data.frame(Feature = names(data),  Type = sapply(data, class), row.names = NULL, Descriptions = Descriptions)
+emailTableInfo
+```
+### Counts of NA
+```{r}
+na_df = data[rowSums(is.na(data)) > 0,]
+dim(na_df)
+head(na_df, n = 10)
+```
+
+### Drop NAs 
+```{r}
+data = data[complete.cases(data), ]
+row.names(data) = NULL 
+```
+
+
+```{r}
+ggplot(emailDFrp, aes(x=isSpam)) +
+  geom_bar(fill = "grey41")+
+  ggtitle("Spam vs. Non-Spam Split")
+```
+```{r}
+ggplot(data = emailDFrp) +
+  geom_count(mapping = aes(x = isSpam, y = isRe))+
+  ggtitle("Spam vs. isRe count")
+```
+
+```{r}
+ggplot(data = emailDFrp) +
+  geom_count(mapping = aes(x = isSpam, y = priority))+
+  ggtitle("Spam vs. mail priority count")
+```
+
+
+```{r}
+emailDFrp %>% 
+  count(isInReplyTo, isSpam) %>%  
+  ggplot(mapping = aes(x = isInReplyTo, y = isSpam)) +
+    geom_tile(mapping = aes(fill = n)) + ggtitle("Pairwise isSpam vs isInReplyTo")
 ```
