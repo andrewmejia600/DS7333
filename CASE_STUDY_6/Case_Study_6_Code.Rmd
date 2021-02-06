@@ -254,6 +254,17 @@ xgbFinal = xgboost(data=x, label= y, nrounds = 100, max_depth = 7, eta = 0.3, ga
 
 ```
 
+save model file for later retrieval
+```{r}
+#commented out since I have already saved it
+#xgb.save(xgbFinal, "xgbFinal")
+```
+
+load model file if not already loaded
+```{r}
+xgb.load("xgbFinal")
+```
+
 Check results of final model
 ```{r}
 
@@ -318,6 +329,8 @@ library(DiagrammeR)
 gr = xgb.plot.tree(model=xgbFinal, trees = 0, render = FALSE)
 export_graph(gr,'tree.pdf',width=1500, height=1500)
 ```
+
+
 
 ###################################################################################################################################################################################
 ###################################################################################################################################################################################
