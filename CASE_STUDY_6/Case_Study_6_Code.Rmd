@@ -151,47 +151,8 @@ varImpPlot(random_forest_1, cex = .7, main = "Variable Importance",pt.cex = 1,co
 ############################################################################################################################################
 ############################################################################################################################################
 
-```{r}
-#keeping most effective features (gini)
 
-data2 = data %>% select(isSpam, perCaps, perHTML, forwards, bodyCharCt, numEnd, numLines, subBlanks, isInReplyTo, isRe, numDlr, subSpamWords, numRec)
-
-#stratified split 
-set.seed(rand_seed)
-train_partition =  createDataPartition(
-  y= data2$isSpam,
-  p = .80,
-  list = FALSE
-)
-train2 = emailDFrp[train_partition,]
-test2 =  emailDFrp[-train_partition,]
-print("Number of records in Training data")
-nrow(train)
-print("Number of records in Testing data")
-nrow(test)
-
-```
-
-```{r}
-head(data2)
-```
-
-
-```{r}
-
-set.seed(rand_seed)
-# create baseline random forest model
-random_forest_2 <- randomForest(isSpam ~., data = train2, ntree = 50, importance=TRUE, na.action = na.roughfix, maxnodes = 10)
-preds_2 = predict(random_forest_2,test2)
-confusionMatrix(preds_2,test2$isSpam, positive = "T")
-```
-
-After actually reading up on Random Forest, I now realize that dropping unimportant features doesn't do anything.
-
-
-
-
-Looping through some values for our parameters to see if that helps
+Looping through some values for the ntree and maxnodes parameters
 
 ```{r}
 #loop for ntree
@@ -235,14 +196,34 @@ for (val in x) {
 
 ```
 
-It looks like we have some promising results between 200-800.  Testing 400 for now
+It looks like we have some promising results between 200-800.  Zeroing in on that range
 
 ```{r}
-#Random forest with optimal ntree and maxnodes (400 & 400)
+#loop for maxnodes
+
+#blank df
+#results <- data.frame(ntree=integer(0), accuracy=numeric(0), sensitivity=numeric(0), specificity=numeric(0))
+
+x <- c(200, 300, 400, 500, 600, 700, 800)
+
+for (val in x) {
+  random_forest <- randomForest(isSpam ~., data = train, ntree = 400, importance=TRUE, na.action = na.roughfix, maxnodes = val)
+  preds = predict(random_forest,test)
+  sens = sensitivity(preds,test$isSpam)
+  spec = specificity(preds,test$isSpam)
+  print(val)
+  print(sens)
+  print(spec)
+}
+
+```
+
+```{r}
+#Random forest with optimal ntree and maxnodes (400 & 600)
 
 set.seed(rand_seed)
 # create baseline random forest model
-random_forest_1 <- randomForest(isSpam ~., data = train, ntree = 400, importance=TRUE, na.action = na.roughfix, maxnodes = 400)
+random_forest_1 <- randomForest(isSpam ~., data = train, ntree = 400, importance=TRUE, na.action = na.roughfix, maxnodes = 600)
 preds_1 = predict(random_forest_1,test)
 confusionMatrix(preds_1,test$isSpam)
 ```
@@ -255,4 +236,22 @@ varImpPlot(random_forest_1, cex = .7, main = "Variable Importance",pt.cex = 1,co
 ```
 
 It looks like PerCaps and perHTML both affect both accuracy and gini significantly
+
+
+ROC Curve 
+
+
+```{r}
+# ROC Curve
+
+library(pROC)
+
+test_spam_num = test$isSpam %>% as.integer(as.character(test$isSpam))
+preds_num = preds %>% as.integer(as.character(preds))
+
+
+rfROC <- roc(test_spam_num ~ preds_num, plot=TRUE, print.auc=TRUE,col="blue",lwd=4,legacy.axes=TRUE,main="ROC Curve")
+```
+
+
 
