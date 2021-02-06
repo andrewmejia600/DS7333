@@ -91,7 +91,7 @@ train %>% count(isSpam)
 test %>% count(isSpam) 
 ```
 
-
+Simple CART tree
 ```{r}
 CART_Fit = rpart(isSpam~., data=train, method='class')
 
@@ -182,7 +182,7 @@ Check the parameters for the model that had best results
 ```{r}
 xgBoostGrid$bestTune
 ```
-Convert labels to 0 and 1
+Convert labels to 0 and 1 in both the train and test data
 ```{r}
 lvl = c('F','T')
 tmp = as.character(train$isSpam)
@@ -241,7 +241,7 @@ plot(perf,main=paste0("XGBoost ROC curve: AUC= ",auc), xlim=c(0,0.1), ylim=c(.8,
 
 ```
 
-We want to optimize for minimal false positives to ensure important messages get through without being blocked, this threshold drops the FPs to 6 from 14, however we miss 126 spam messages in this test set versus missing only 48 with a threshold of .5
+We want to optimize for minimal false positives to ensure important messages get through without being blocked.  by using a threshold of .875, we minimize FPs
 ```{r}
 #now let's try to use confusionMatrix from the caret package with threshold set to minimize falses based on ROC curve analysis
 pred_label = as.numeric(pred>.875)
@@ -250,6 +250,7 @@ confusionMatrix(factor(pred_label), factor(test$isSpam) , positive = "1")
 ```
 
 Feature importance
+we can see with the table below perCaps is our most important feature followed by numLines
 ```{r}
 xgb.importance(feature_names = colnames(train[,-1]), model = xgbFinal, data=train[,-1], label=train[,1])
 ```
