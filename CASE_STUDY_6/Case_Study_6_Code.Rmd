@@ -45,6 +45,7 @@ library(DiagrammeR)
 library(doSNOW)
 library(parallel)
 library(ggplot2)
+library(xgboost)
 ```
 
 ```{r}
@@ -146,7 +147,7 @@ START:  BRIAN GAITHER
 ###################################################################################################################################################################################
 
 ```{r}
-file_ext = "C:/Users/blgai/OneDrive/Documents/School/SMU/Courses/Spring 2021/Quantifying The World/Case Study 6/data/"
+file_ext = "/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/"
 data = load(paste0(file_ext, "data.Rda"))
 ```
 
@@ -262,7 +263,7 @@ save model file for later retrieval
 
 load model file if not already loaded
 ```{r}
-xgb.load("xgbFinal")
+xgb.load("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/xgbFinal")
 ```
 
 Check results of final model
