@@ -51,6 +51,11 @@ rand_seed = 42
 ```
 
 ```{r}
+dim(data)
+```
+
+
+```{r}
 Descriptions = c('Multi-Level Factor Email Name', 'Binary Factor is Spam T/F', 'Binary Factor isRe ** T/F' , 'Binary Factor has Underscore T/F' , 
                  'Binary Factor Priority T/F', 'Binary Factor is Replying T/F', 'Binary Factor Sorted Received ** T/F', 
                  'Binary Factor SubPunc **T/F', 'Binary Factor Multi Part Text T/F', 'Binary Factor Has Image in Email T/F', 
@@ -76,10 +81,153 @@ data = data[complete.cases(data), ]
 row.names(data) = NULL 
 ```
 
+```{r}
+spamtable <- prop.table(table(data$isSpam))*100
+spamtable
+```
+
 
 ```{r}
-ggplot(data, aes(x=isSpam)) +
-  geom_bar(fill = "grey41")+
+ggplot(data, aes(x=isSpam, fill=isSpam)) +
+  geom_bar()+
+  ggtitle("Spam vs. Non-Spam Split")
+```
+
+```{r}
+ggplot(data, aes(x=perCaps, color=isSpam))+geom_density()+ggtitle("PerCaps - Spam vs Ham")
+```
+
+```{r}
+ggplot(data, aes(x=subBlanks, fill=isSpam))+geom_density()
+```
+
+```{r}
+ggplot(data, aes(x=forwards, color=isSpam))+geom_density()
+```
+
+```{r}
+ggplot(data, aes(x=avgWordLen, color=isSpam))+geom_density()
+```
+
+```{r}
+
+ggplot(data, aes(x=isRe, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("isRe Spam Prevalence")
+```
+
+
+
+```{r}
+data_tmp <- subset(data, isRe == 'T')
+ggplot(data_tmp, aes(x=isRe, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("isRe Spam Prevalence (Only isRe = T)")
+```
+
+
+```{r}
+
+ggplot(data, aes(x=hasImages, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("hasImages Spam Prevalence")
+```
+
+```{r}
+data_tmp <- subset(data, hasImages == 'T')
+ggplot(data_tmp, aes(x=hasImages, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("hasImages Spam Prevalence (Only isRe = T)")
+```
+
+
+```{r}
+
+ggplot(data, aes(x=subSpamWords, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("subSpamWords Spam Prevalence")
+```
+
+
+```{r}
+
+ggplot(data, aes(x=subPunc, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("subPunc Spam Prevalence")
+```
+
+```{r}
+data_tmp <- subset(data, subPunc == 'T')
+ggplot(data_tmp, aes(x=subPunc, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("subPunc Spam Prevalence (Only subPunc = T)")
+```
+
+```{r}
+
+ggplot(data, aes(x=underscore, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("underscore Spam Prevalence")
+```
+
+```{r}
+data_tmp <- subset(data, underscore == 'T')
+ggplot(data_tmp, aes(x=underscore, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("underscore Spam Prevalence (Only underscore = T)")
+```
+
+
+
+```{r}
+
+ggplot(data, aes(x=priority, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("priority Spam Prevalence")
+```
+
+```{r}
+data_tmp <- subset(data, priority == 'T')
+ggplot(data_tmp, aes(x=priority, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("priority Spam Prevalence (Only priority = T)")
+```
+
+
+
+```{r}
+
+ggplot(data, aes(x=noHost, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("noHost Spam Prevalence")
+```
+
+```{r}
+data_tmp <- subset(data, noHost == 'T')
+ggplot(data_tmp, aes(x=noHost, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("noHost Spam Prevalence (Only noHost = T)")
+```
+
+
+```{r}
+
+ggplot(data, aes(x=isYelling, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("Spam vs. Non-Spam Split")
+```
+
+```{r}
+
+ggplot(data, aes(x=numEnd, fill = isSpam)) +
+  geom_bar()+
+  ggtitle("Spam vs. Non-Spam Split")
+```
+
+```{r}
+
+ggplot(data, aes(x=isOrigMsg, fill = isSpam)) +
+  geom_bar()+
   ggtitle("Spam vs. Non-Spam Split")
 ```
 
@@ -228,6 +376,14 @@ preds_1 = predict(random_forest_1,test)
 confusionMatrix(preds_1,test$isSpam)
 ```
 
+```{r}
+
+preds_1 = predict(random_forest_1,train)
+confusionMatrix(preds_1,train$isSpam)
+
+```
+
+
 #Variable importance plot
 #https://rdrr.io/cran/randomForest/man/varImpPlot.html
 ```{r, fig.dim=c(12,14)}
@@ -252,6 +408,13 @@ preds_num = preds %>% as.integer(as.character(preds))
 
 rfROC <- roc(test_spam_num ~ preds_num, plot=TRUE, print.auc=TRUE,col="blue",lwd=4,legacy.axes=TRUE,main="ROC Curve")
 ```
+
+
+
+```{r}
+
+```
+
 
 
 
