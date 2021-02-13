@@ -57,15 +57,36 @@ rand_seed = 42
 ```
 
 ```{r}
-Descriptions = c('Multi-Level Factor Email Name', 'Binary Factor is Spam T/F', 'Binary Factor isRe ** T/F' , 'Binary Factor has Underscore T/F' , 
-                 'Binary Factor Priority T/F', 'Binary Factor is Replying T/F', 'Binary Factor Sorted Received ** T/F', 
-                 'Binary Factor SubPunc **T/F', 'Binary Factor Multi Part Text T/F', 'Binary Factor Has Image in Email T/F', 
-                 'Binary Factor is PGPsinged ** T/F', 'Binary Factor is SubSpamWords ** T/F', 'Binary Factor No Host ** T/F', 
-                 'Binary Factor numEnd** T/F', 'Binary Factor is Yelling T/F', 'Binary Factor is Orignal Message T/F', 
-                 'Binary Factor is Dear** T/F', 'Binary Factor is Wrote ** T/F', 'Email Line Count', 
-                 'Body Character Count', 'SubExc ** Count', 'Sub Queues ** Count', 'Number of ATT **', 'Number of Receipts **', 
-                 'Number of Caps **' , 'Hour **', 'PerHTML **' , 'SubBlanks **', 'Fowards **', 'Average word Length', 
-                 'Number of Dlr **' )
+Descriptions = c('Multi-Level Factor Email Name', 'Binary Factor is Spam T/F, True if Spam', 
+                 'Binary Factor T/F, TRUE if Re: appears at the start of the subject.' , 
+                 'Binary Factor TRUE if email address in the From field of the header contains an underscore.' , 
+                 'Binary Factor TRUE if a Priority key is present in the header.', 
+                 'Binary Factor TRUE if the In-Reply-To key is present in the header.', 
+                 'Binary Factor TRUE if the recipients’ email addresses are sorted.', 
+                 'Binary Factor TRUE if words in the subject have punctuation or numbers embedded in them, e.g., w!se.', 
+                 'Binary Factor TRUE if the MIME type is multipart/text.', 
+                 'Binary Factor TRUE if the message contains images.', 
+                 'Binary Factor TRUE if the message contains a PGP signature.', 
+                 'Binary Factor TRUE if the subject contains one of the words in a spam word vector.', 
+                 'Binary Factor TRUE if there is no hostname in the Message-Id key in the header.', 
+                 'Binary Factor TRUE if the email sender’s address (before the @) ends in a number.',
+                 'Binary Factor TRUE if the subject is all capital letters.', 
+                 'Binary Factor TRUE if the message body contains the phrase original message.', 
+                 'Binary Factor TRUE if the message body contains the word dear.', 
+                 'Binary Factor TRUE if the message contains the phrase wrote:.', 
+                 'Email Line Count', 
+                 'Body Character Count', 
+                 'Number of exclamation marks in the subject.', 
+                 'Number of question marks in the subject.', 
+                 'Number of attachments in the message.', 
+                 'Number of recipients of the message, including CCs.', 
+                 'Percentage of capitals among all letters in the message body, excluding attachments.' , 
+                 'Hour of the day in the Date field.', 
+                 'Percentage of characters in HTML tags in the message body in comparison to all characters.' , 
+                 'Percentage of blanks in the subject.', 
+                 'Number of forward symbols in a line of the body, e.g., >>> xxx contains 3 forwards.', 
+                 'The average length of the words in a message.', 
+                 'Number of dollar signs in the message body.' )
 emailTableInfo = data.frame(Feature = names(data),  Type = sapply(data, class), row.names = NULL, Descriptions = Descriptions)
 emailTableInfo
 ```
@@ -115,7 +136,7 @@ data %>%
 set.seed(rand_seed)
 train_partition =  createDataPartition(
   y= data$isSpam,
-  p = .80,
+  p = .70,
   list = FALSE
 )
 train = emailDFrp[train_partition,]
@@ -314,6 +335,10 @@ Feature importance
 we can see with the table below perCaps is our most important feature followed by numLines
 ```{r}
 xgb.importance(feature_names = colnames(train[,-1]), model = xgbFinal, data=train[,-1], label=train[,1])
+```
+
+```{r}
+xgb.plot.importance(xgb.importance(feature_names = colnames(train[,-1]), model = xgbFinal, data=train[,-1], label=train[,1]), top_n = 10)
 ```
 
 Plot tree
