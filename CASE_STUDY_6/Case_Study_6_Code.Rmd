@@ -200,6 +200,7 @@ emailDFrp = emailDFrp[complete.cases(emailDFrp), ]
 
 let's create a stratified training and test set to ensure proper proportion of the target variable
 ```{r}
+set.seed(1234)
 train.index = createDataPartition(emailDFrp$isSpam, p=.7, list=FALSE)
 train = emailDFrp[train.index,]
 test = emailDFrp[-train.index,]
@@ -284,7 +285,7 @@ save model file for later retrieval
 
 load model file if not already loaded
 ```{r}
-xgb.load("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/xgbFinal")
+xgbFinal = xgb.load("/media/andrew/Seagate Backup Plus Drive/Documents/School/HomeWork/QTW/DS7333/CASE_STUDY_6/xgbFinal")
 ```
 
 Check results of final model
@@ -345,7 +346,7 @@ Plot tree
 interpretation from answer 12 on stack exchange here:  https://stats.stackexchange.com/questions/395697/what-is-an-intuitive-interpretation-of-the-leaf-values-in-xgboost-base-learners
 When performing a binary classification task, by default, XGBoost treats it as a logistic regression problem. As such the raw leaf estimates seen here are log-odds and can be negative. The result from each individual tree are indeed combined together, but they are not probabilities (yet) but rather the estimates of the score before performing the logistic transformation done when performing logistic regression. For that reason the individual as well as the combined estimates show can naturally be negative; the negative sign simply implies "less" chance.  The leaves contain the estimates from their respective base-learner on the domain of the function where the gradient boosting procedure takes place. For the presented binary classification task, the link used is the logit so these estimates represent log-odds; in terms of log-odds, negative values are perfectly normal. To get probability estimates we simply use the logistic function, which is the inverse of the logit function.
 ```{r}
-xgb.plot.tree(model=xgbFinal, trees = 0, plot_width = 900, plot_height = 900, show_node_id = TRUE)
+xgb.plot.tree(model=xgbFinal, trees = 0, plot_width = 1500, plot_height = 1500, show_node_id = TRUE)
 
 ```
 
