@@ -231,6 +231,7 @@ Check the parameters for the model that had best results
 ```{r}
 xgBoostGrid$bestTune
 ```
+
 Convert labels to 0 and 1 in both the train and test data
 ```{r}
 lvl = c('F','T')
@@ -250,8 +251,14 @@ Build final model using best parameters
 y = data.matrix(train[,1])
 x = data.matrix(train[,-1])
 
+#grid search indicates max_depth 7 is best, but appears to be slightly overfit.  let's try with 6
 xgbFinal = xgboost(data=x, label= y, nrounds = 100, max_depth = 7, eta = 0.3, gamma = 0, colsample_bytree = 0.5, min_child_weight = 2, subsample = 1, objective="binary:logistic")
 
+```
+
+load the best xgboost model from disk
+```{r}
+xgbFinal = xgb.load("xgbFinal")
 ```
 
 Check results of final model
@@ -293,9 +300,16 @@ plot(perf,main=paste0("XGBoost ROC curve: AUC= ",auc), xlim=c(0,0.1), ylim=c(.8,
 We want to optimize for minimal false positives to ensure important messages get through without being blocked.  by using a threshold of .875, we minimize FPs
 ```{r}
 #now let's try to use confusionMatrix from the caret package with threshold set to minimize falses based on ROC curve analysis
-pred_label = as.numeric(pred>.875)
+pred_label = as.numeric(pred>.88)
 #create confusion matrix
 confusionMatrix(factor(pred_label), factor(test$isSpam) , positive = "1")
+```
+compare with training accuracy to check for overfitting
+```{r}
+#make the prediction
+pred_train = predict(xgbFinal, data.matrix(train[,-1]))
+pred_train_label = as.numeric(pred_train>.88)
+confusionMatrix(factor(pred_train_label), factor(train$isSpam) , positive = "1")
 ```
 
 Feature importance
