@@ -1,0 +1,2 @@
+conda env create -f <config>.yml --prefix /<home_directory>/<user>/<directory>/<env_name>/env
+
